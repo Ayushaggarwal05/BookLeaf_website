@@ -189,31 +189,55 @@ export const BooksPage: React.FC = () => {
 
             <div className="p-6 space-y-5 text-xs text-gray-600">
               {/* Financial Metrics */}
-              <div className="grid grid-cols-2 gap-3 bg-cream-50 p-4 rounded-xl border border-cream-200">
-                <div>
-                  <span className="text-gray-500 block">Retail MRP:</span>
-                  <span className="font-semibold text-sm text-gray-900 font-mono">
-                    {selectedBook.mrp ? `₹${selectedBook.mrp}` : 'Not Set'}
-                  </span>
+              <div className="bg-cream-50 p-4 rounded-xl border border-cream-200 space-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div>
+                    <span className="text-gray-500 block text-[11px]">Retail MRP:</span>
+                    <span className="font-semibold text-sm text-gray-900 font-mono">
+                      {selectedBook.mrp ? `₹${selectedBook.mrp}` : 'Not Set'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block text-[11px]">Author Royalty Rate:</span>
+                    <span className="font-semibold text-sm text-brand-800 font-mono">
+                      {selectedBook.author_royalty_per_copy ? `₹${selectedBook.author_royalty_per_copy} / copy` : 'Not Set'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block text-[11px]">Total Copies Sold:</span>
+                    <span className="font-bold text-sm text-gray-900 font-mono">
+                      {selectedBook.total_copies_sold?.toLocaleString('en-IN') || 0} copies
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block text-[11px]">Cumulative Royalty:</span>
+                    <span className="font-bold text-sm text-brand-950 font-mono">
+                      <CurrencyFormatter amount={selectedBook.total_royalty_earned} />
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block text-[11px]">Already Paid Out:</span>
+                    <span className="font-semibold text-sm text-emerald-800 font-mono">
+                      <CurrencyFormatter amount={selectedBook.royalty_paid} />
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block text-[11px]">Outstanding Balance:</span>
+                    <span className="font-bold text-sm text-amber-800 font-mono">
+                      <CurrencyFormatter amount={selectedBook.royalty_pending} />
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-500 block">Author Royalty Rate:</span>
-                  <span className="font-semibold text-sm text-brand-800 font-mono">
-                    {selectedBook.author_royalty_per_copy ? `₹${selectedBook.author_royalty_per_copy} / copy` : 'Not Set'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-500 block">Cumulative Royalty:</span>
-                  <span className="font-bold text-sm text-brand-950 font-mono">
-                    <CurrencyFormatter amount={selectedBook.total_royalty_earned} />
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-500 block">Outstanding Balance:</span>
-                  <span className="font-bold text-sm text-amber-800 font-mono">
-                    <CurrencyFormatter amount={selectedBook.royalty_pending} />
-                  </span>
-                </div>
+
+                {/* Calculation Transparency Breakdown */}
+                {selectedBook.author_royalty_per_copy && (
+                  <div className="pt-2.5 border-t border-cream-200 text-[11px] text-gray-500 flex items-center justify-between">
+                    <span>Royalty Formula:</span>
+                    <span className="font-mono text-gray-700 font-medium">
+                      {selectedBook.total_copies_sold} copies × ₹{selectedBook.author_royalty_per_copy} = <CurrencyFormatter amount={selectedBook.total_royalty_earned} />
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Manufacturing & Distribution */}

@@ -31,14 +31,25 @@ bookleaf-support-portal/
 │   │   ├── repositories/             # Data access layer
 │   │   └── utils/
 │   ├── migrations/                   # Alembic migration scripts
-│   └── tests/                        # Full pytest suite (24 automated tests)
+│   └── tests/                        # Full pytest suite (53 automated tests)
 ├── data/
 │   └── bookleaf_sample_data.json     # Official assignment sample dataset
 ├── docs/
-│   └── architecture.md               # Technical architecture & ERD documentation
-├── frontend/                         # Reserved for upcoming frontend phase
+│   ├── architecture.md               # Technical architecture & ERD documentation
+│   ├── api.md                        # REST API endpoint reference
+│   ├── ai-strategy.md                # Gemini AI triage & prompt engineering design
+│   └── approach-and-tradeoffs.md     # Architectural priorities & technical trade-offs
+├── frontend/                         # React 19 + TypeScript + Vite UI (18 Vitest tests)
+│   ├── src/components/               # Reusable UI & protected role-based routing
+│   ├── src/context/                  # Authentication context & session management
+│   ├── src/pages/                    # Author portal & admin dashboard pages
+│   ├── src/services/                 # API client & admin API integration
+│   └── src/types/                    # Strict TypeScript data models
 ├── .env.example                      # Environment variables template
 ├── .gitignore                        # Git exclusion rules
+├── Dockerfile                        # Multi-stage production container build
+├── Procfile                          # Process definition for hosted deployment
+├── render.yaml                       # Render Infrastructure-as-Code blueprint
 └── README.md                         # Project documentation
 ```
 
@@ -53,20 +64,20 @@ bookleaf-support-portal/
 ### 2. Set Up Virtual Environment & Dependencies
 
 ```bash
-# Clone or navigate to the project directory
-cd "k:/Work/Assignment for job/BookLeaf"
+# Navigate to the backend directory
+cd backend
 
-# Create a virtual environment
+# Create a virtual environment inside backend/
 python -m venv .venv
 
 # Activate the virtual environment
 # Windows (PowerShell):
-.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 # Linux / macOS:
 source .venv/bin/activate
 
 # Install dependencies
-pip install -r backend/requirements.txt
+pip install -r requirements.txt
 ```
 
 ### 3. Environment Configuration
@@ -91,10 +102,10 @@ Key environment variables:
 
 ### 4. Run Database Migrations
 
-Apply database migrations to head:
+Apply database migrations to head (from inside `backend/`):
 
 ```bash
-python -m alembic -c backend/alembic.ini upgrade head
+python -m alembic upgrade head
 ```
 
 ### 5. Seed the Official Dataset & Provision Demo Accounts
@@ -102,7 +113,7 @@ python -m alembic -c backend/alembic.ini upgrade head
 Seed the database with authors and books from `data/bookleaf_sample_data.json` and initialize demo credentials:
 
 ```bash
-python backend/seed.py
+python seed.py
 ```
 
 *Note: The seed script is completely idempotent. Running it multiple times safely updates records without duplicating authors, books, or altering user-created support tickets.*
@@ -117,10 +128,10 @@ python backend/seed.py
 
 ### 7. Run Backend Automated Tests
 
-Execute the automated backend test suite with verbose reporting:
+Execute the automated backend test suite with verbose reporting (from inside `backend/`):
 
 ```bash
-.venv\Scripts\python.exe -m pytest backend/tests -v
+pytest tests -v
 ```
 
 All **53 tests** cover:
@@ -140,7 +151,7 @@ All **53 tests** cover:
 The frontend is built with React 19, TypeScript, Vite, and Tailwind CSS:
 
 ```bash
-cd frontend
+cd ../frontend
 
 # Install frontend dependencies
 npm install
@@ -157,10 +168,10 @@ npm run dev
 
 ### 9. Start the Backend Server
 
-Start the FastAPI application using Uvicorn:
+Start the FastAPI application using Uvicorn (from inside `backend/`):
 
 ```bash
-uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 Once started:
@@ -170,4 +181,5 @@ Once started:
 - **AI Strategy & Architecture**: [docs/ai-strategy.md](docs/ai-strategy.md)
 - **API Documentation File**: [docs/api.md](docs/api.md)
 - **System Architecture**: [docs/architecture.md](docs/architecture.md)
+- **Approach & Trade-offs**: [docs/approach-and-tradeoffs.md](docs/approach-and-tradeoffs.md)
 

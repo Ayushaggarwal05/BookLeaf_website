@@ -3,15 +3,17 @@ from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Determine project root directory (BookLeaf/)
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+# Determine workspace root directory (BookLeaf/)
+BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+WORKSPACE_ROOT = BACKEND_DIR.parent
+PROJECT_ROOT = WORKSPACE_ROOT
 
 
 class Settings(BaseSettings):
     """Application settings and environment configuration."""
 
     model_config = SettingsConfigDict(
-        env_file=str(PROJECT_ROOT / ".env"),
+        env_file=[str(WORKSPACE_ROOT / ".env"), str(BACKEND_DIR / ".env")],
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -22,8 +24,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
 
-    # Database configuration (defaults to SQLite in project root)
-    DATABASE_URL: str = f"sqlite:///{(PROJECT_ROOT / 'bookleaf_dev.db').as_posix()}"
+    # Database configuration (defaults to SQLite in backend directory)
+    DATABASE_URL: str = f"sqlite:///{(BACKEND_DIR / 'bookleaf_dev.db').as_posix()}"
 
     # CORS configuration
     FRONTEND_ORIGIN: str = "http://localhost:3000"
@@ -63,8 +65,8 @@ class Settings(BaseSettings):
     @classmethod
     def assemble_database_url(cls, v: Optional[str]) -> str:
         if not v or not v.strip():
-            # Default to canonical root sqlite db
-            return f"sqlite:///{(PROJECT_ROOT / 'bookleaf_dev.db').as_posix()}"
+            # Default to canonical backend sqlite db
+            return f"sqlite:///{(BACKEND_DIR / 'bookleaf_dev.db').as_posix()}"
         v = v.strip()
         # Normalize legacy postgres:// URI to standard postgresql://
         if v.startswith("postgres://"):
@@ -76,7 +78,10 @@ class Settings(BaseSettings):
             if ":" not in sqlite_path_str and not sqlite_path_str.startswith("/"):
                 # Clean relative markers
                 cleaned = sqlite_path_str.lstrip("./").lstrip(".\\")
-                canonical_path = (PROJECT_ROOT / cleaned).resolve()
+                if (BACKEND_DIR / cleaned).is_file():
+                    canonical_path = (BACKEND_DIR / cleaned).resolve()
+                else:
+                    canonical_path = (PROJECT_ROOT / cleaned).resolve()
                 v = f"sqlite:///{canonical_path.as_posix()}"
         return v
 
@@ -95,17 +100,20 @@ class Settings(BaseSettings):
         if candidate.is_file():
             return candidate
 
+        root_candidate = PROJECT_ROOT / self.SAMPLE_DATA_PATH
+        if root_candidate.is_file():
+            return root_candidate
+
         alternatives = [
             PROJECT_ROOT / "data" / "bookleaf_sample_data.json",
             PROJECT_ROOT / "data" / "FULLSTACK-SAMPLEDATA (1) (1) (1).json",
             Path("data/bookleaf_sample_data.json"),
-            Path("data/FULLSTACK-SAMPLEDATA (1) (1) (1).json"),
         ]
         for alt in alternatives:
             if alt.is_file():
                 return alt
 
-        return candidate
+        return root_candidate
 
 
 settings = Settings()

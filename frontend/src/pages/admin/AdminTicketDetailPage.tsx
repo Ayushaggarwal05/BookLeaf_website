@@ -7,6 +7,7 @@ import {
   User, 
   ShieldCheck, 
   AlertCircle, 
+  AlertTriangle,
   CheckCircle2, 
   RefreshCw, 
   Sparkles, 
@@ -72,7 +73,7 @@ export const AdminTicketDetailPage: React.FC = () => {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
   const [isUpdatingTriage, setIsUpdatingTriage] = useState<boolean>(false);
   const [isUpdatingAssignee, setIsUpdatingAssignee] = useState<boolean>(false);
-  const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'warning' | 'error'; message: string } | null>(null);
 
   // Author reply form
   const [replyBody, setReplyBody] = useState<string>('');
@@ -97,11 +98,11 @@ export const AdminTicketDetailPage: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const showFeedback = (msg: string) => {
-    setActionSuccessMessage(msg);
+  const showFeedback = (message: string, type: 'success' | 'warning' | 'error' = 'success') => {
+    setToast({ type, message });
     setTimeout(() => {
-      if (isMountedRef.current) setActionSuccessMessage(null);
-    }, 4000);
+      if (isMountedRef.current) setToast(null);
+    }, 5000);
   };
 
   const fetchTicket = useCallback(async (silent = false) => {
@@ -291,14 +292,23 @@ export const AdminTicketDetailPage: React.FC = () => {
       setDraftResult(res);
       if (res.status === 'success' && res.draft_response) {
         setDraftText(res.draft_response);
-        showFeedback('AI draft response generated with BookLeaf policy context.');
+        showFeedback('AI draft response generated with BookLeaf policy context.', 'success');
       } else if (res.status === 'unavailable') {
-        setAiError(res.error_message || 'Gemini API key is not configured. Falling back to manual response.');
+        const errorNotice = res.error_message || 'Gemini API key is not configured on the backend. Automated AI drafting is unavailable.';
+        setDraftText('');
+        setAiError(errorNotice);
+        showFeedback(errorNotice, 'warning');
       } else {
-        setAiError(res.error_message || 'Could not generate draft response.');
+        const errorNotice = res.error_message || 'AI response generation failed. Please check backend configuration.';
+        setDraftText('');
+        setAiError(errorNotice);
+        showFeedback(errorNotice, 'error');
       }
     } catch (err: any) {
-      setAiError(err.message || 'Failed to communicate with AI drafting service.');
+      const errorNotice = err.message || 'Failed to communicate with AI drafting service.';
+      setDraftText('');
+      setAiError(errorNotice);
+      showFeedback(errorNotice, 'error');
     } finally {
       setIsGeneratingDraft(false);
     }
@@ -414,11 +424,31 @@ export const AdminTicketDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Action Feedback Banner */}
-      {actionSuccessMessage && (
-        <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3 flex items-center gap-2 text-xs text-emerald-900 font-semibold shadow-soft">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-          <span>{actionSuccessMessage}</span>
+      {/* Action / Warning Toast Banner */}
+      {toast && (
+        <div
+          className={`rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs font-semibold shadow-soft border transition-all ${
+            toast.type === 'error'
+              ? 'bg-rose-50 border-rose-300 text-rose-900'
+              : toast.type === 'warning'
+              ? 'bg-amber-50 border-amber-300 text-amber-950'
+              : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />}
+            {toast.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-700 flex-shrink-0" />}
+            {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
+            <span>{toast.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="text-xs opacity-60 hover:opacity-100 transition px-1.5 py-0.5 rounded hover:bg-black/5"
+            title="Dismiss notice"
+          >
+            ✕
+          </button>
         </div>
       )}
 
