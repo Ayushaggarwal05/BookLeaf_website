@@ -23,6 +23,7 @@ from backend.app.schemas.portal import (
 )
 from backend.app.services.ticket_service import TicketService
 from backend.app.services.ai_service import ai_service
+from backend.app.services.knowledge_base import REVERSE_CATEGORY_MAP
 
 router = APIRouter(prefix="/author", tags=["Author Portal (Tenant-Isolated)"])
 
@@ -190,43 +191,30 @@ def create_author_ticket(
     ticket_service = TicketService(db)
     ticket_number = ticket_service.generate_ticket_number()
 
-    # AI Triage & Priority Scoring (Non-blocking with safe fallback)
-    try:
-        triage = ai_service.triage_ticket(
-            subject=ticket_in.subject.strip(),
-            description=ticket_in.description.strip(),
-            author_name=current_author.full_name,
-            book_title=book_title,
-            book_isbn=book.isbn if book else None,
-        )
-        assigned_category = triage.category
-        assigned_priority = triage.priority_code
-        ai_metadata = {
-            "category": triage.category,
-            "priority": triage.priority,
-            "suggested_category": triage.category,
-            "suggested_priority": triage.priority,
-            "priority_code": triage.priority_code,
-            "confidence": triage.confidence,
-            "reasoning": triage.reasoning,
-            "applicable_policies": getattr(triage, "applicable_policies", []),
-            "status": triage.status,
-            "model": triage.model,
-            "provider": getattr(triage, "provider", triage.model),
-            "created_at": triage.created_at,
-        }
-    except Exception as e:
-        assigned_category = ticket_in.category or "General Inquiry"
-        assigned_priority = "MEDIUM"
-        ai_metadata = {
-            "category": assigned_category,
-            "priority": "Medium",
-            "suggested_category": assigned_category,
-            "suggested_priority": "Medium",
-            "priority_code": "MEDIUM",
-            "status": "unavailable",
-            "reason": str(e),
-        }
+    # Fast, zero-cost deterministic rule-based triage on ingestion (0 API quota risk, 0ms latency)
+    # Deep LLM triage and response drafting is reserved on-demand for authenticated admin review
+    triage = ai_service._heuristic_triage(
+        subject=ticket_in.subject.strip(),
+        description=ticket_in.description.strip(),
+        status="rule_engine",
+        reason="Deterministic rule-based ingestion applied. Full Gemini LLM analysis available on-demand.",
+    )
+    assigned_category = ticket_in.category if (ticket_in.category and ticket_in.category != "GENERAL_INQUIRY") else triage.category
+    assigned_priority = triage.priority_code
+    ai_metadata = {
+        "category": triage.category,
+        "priority": triage.priority,
+        "suggested_category": triage.category,
+        "suggested_priority": triage.priority,
+        "priority_code": triage.priority_code,
+        "confidence": 0.85,
+        "reasoning": "Deterministic rule-based ingestion applied ($0 API cost). Full Gemini LLM analysis available on-demand in Admin Operations.",
+        "applicable_policies": getattr(triage, "applicable_policies", []),
+        "status": "rule_engine",
+        "model": "rule_engine",
+        "provider": "rule_engine",
+        "created_at": triage.created_at,
+    }
 
     ticket = SupportTicket(
         ticket_number=ticket_number,

@@ -44,6 +44,7 @@ const STATUSES = [
   { value: 'WAITING_ON_AUTHOR', label: 'Awaiting Author Reply' },
   { value: 'RESOLVED', label: 'Resolved' },
   { value: 'CLOSED', label: 'Closed' },
+  { value: 'RESOLVED,CLOSED', label: 'Resolved & Closed' },
 ];
 
 const PAGE_SIZE = 20;
@@ -53,6 +54,7 @@ export const AdminTicketsPage: React.FC = () => {
 
   // State
   const [tickets, setTickets] = useState<AdminTicket[]>([]);
+  const [hasNextPage, setHasNextPage] = useState<boolean>(false);
   const [admins, setAdmins] = useState<AdminUserSummary[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,7 +111,7 @@ export const AdminTicketsPage: React.FC = () => {
 
     const filterPayload: AdminTicketFilters = {
       skip,
-      limit: PAGE_SIZE,
+      limit: PAGE_SIZE + 1,
     };
 
     if (statusParam) filterPayload.status = statusParam;
@@ -122,7 +124,13 @@ export const AdminTicketsPage: React.FC = () => {
 
     try {
       const data = await api.admin.getTickets(filterPayload);
-      setTickets(data);
+      if (data.length > PAGE_SIZE) {
+        setHasNextPage(true);
+        setTickets(data.slice(0, PAGE_SIZE));
+      } else {
+        setHasNextPage(false);
+        setTickets(data);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch tickets from admin queue.');
     } finally {
@@ -167,6 +175,7 @@ export const AdminTicketsPage: React.FC = () => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set('page', newPage.toString());
     setSearchParams(nextParams);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const [currentTime] = useState(() => Date.now());
@@ -380,17 +389,29 @@ export const AdminTicketsPage: React.FC = () => {
             <Inbox className="w-6 h-6" />
           </div>
           <h3 className="text-base font-semibold text-brand-950">
-            No tickets match current filters
+            {pageParam > 1 ? `No tickets found on page ${pageParam}` : 'No tickets match current filters'}
           </h3>
           <p className="text-xs text-gray-500 max-w-sm mx-auto mt-1 mb-4">
-            Try adjusting status, priority, staff assignment, or search queries.
+            {pageParam > 1
+              ? 'You have reached beyond the end of the available ticket list.'
+              : 'Try adjusting status, priority, staff assignment, or search queries.'}
           </p>
-          <button
-            onClick={handleResetFilters}
-            className="px-4 py-2 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-xs font-semibold shadow-soft transition"
-          >
-            Reset Filters
-          </button>
+          <div className="flex items-center justify-center gap-3">
+            {pageParam > 1 && (
+              <button
+                onClick={() => handlePageChange(pageParam - 1)}
+                className="px-4 py-2 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-xs font-semibold shadow-soft transition cursor-pointer"
+              >
+                ← Back to Page {pageParam - 1}
+              </button>
+            )}
+            <button
+              onClick={handleResetFilters}
+              className="px-4 py-2 border border-cream-300 bg-white hover:bg-cream-100 text-gray-700 rounded-lg text-xs font-semibold shadow-soft transition cursor-pointer"
+            >
+              Reset Filters
+            </button>
+          </div>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-cream-300 shadow-soft overflow-hidden">
@@ -556,14 +577,15 @@ export const AdminTicketsPage: React.FC = () => {
           {/* Pagination Controls */}
           <div className="p-4 bg-cream-50/50 border-t border-cream-300 flex items-center justify-between text-xs">
             <span className="text-gray-500">
-              Showing page <strong>{pageParam}</strong> ({tickets.length} tickets retrieved)
+              Showing page <strong>{pageParam}</strong> ({tickets.length} tickets shown)
             </span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => handlePageChange(pageParam - 1)}
                 disabled={pageParam <= 1 || loading}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded border border-cream-300 bg-white text-gray-700 hover:bg-cream-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title={pageParam <= 1 ? 'You are on the first page' : 'Go to previous page'}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded border border-cream-300 bg-white text-gray-700 hover:bg-cream-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-cream-100 disabled:text-gray-400 transition"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
                 <span>Previous</span>
@@ -571,8 +593,9 @@ export const AdminTicketsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handlePageChange(pageParam + 1)}
-                disabled={tickets.length < PAGE_SIZE || loading}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded border border-cream-300 bg-white text-gray-700 hover:bg-cream-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                disabled={!hasNextPage || loading}
+                title={!hasNextPage ? 'No more tickets in this queue' : 'Go to next page'}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded border border-cream-300 bg-white text-gray-700 hover:bg-cream-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-cream-100 disabled:text-gray-400 transition"
               >
                 <span>Next</span>
                 <ChevronRight className="w-3.5 h-3.5" />

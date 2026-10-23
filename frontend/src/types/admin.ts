@@ -108,3 +108,17 @@ export interface AiDraftResponse {
   created_at: string;
 }
 
+export interface AiTriageResponse {
+  category: string;
+  priority: string;
+  priority_code: string;
+  confidence: number;
+  reasoning: string;
+  status: string;
+  model: string;
+  created_at: string;
+  applicable_policies?: string[];
+  error_message?: string | null;
+}
+
+

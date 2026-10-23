@@ -134,9 +134,9 @@ Execute the automated backend test suite with verbose reporting (from inside `ba
 pytest tests -v
 ```
 
-All **53 tests** cover:
+- Two-tier AI cost governance: Zero-cost deterministic rule ingestion ($0 API quota risk) + on-demand Gemini AI drafting
 - Gemini AI triage, priority scoring, and knowledge base context extraction
-- Mocked Gemini provider tests for response drafting and timeout/error handling
+- Anchored conversation window and mocked Gemini provider response drafting
 - Offline heuristic fallback and missing API key resilience
 - Admin AI draft generation and triage override application endpoints
 - Role-based authorization guarding AI endpoints from unauthorized authors

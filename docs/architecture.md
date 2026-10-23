@@ -201,8 +201,10 @@ The frontend application (`frontend/`) is implemented using React 19, TypeScript
 
 Implemented in `backend/app/services/ai_service.py` and `knowledge_base.py`:
 - **Model**: `gemini-2.5-flash` via official `google-genai` SDK.
-- **Triage**: Automatic non-blocking categorization into exactly one of 6 approved categories and 4 priority tiers.
-- **Drafting**: Contextual response drafting grounded on BookLeaf's 13 operating policies.
-- **Cost Efficiency**: On-demand execution with ticket-level draft caching.
+- **Two-Tier Cost Governance**:
+  - *Tier 1 (Zero-Cost Ingestion)*: Ticket submission runs deterministic rule-based triage ($0 API cost, 0 network latency, 0 quota risk).
+  - *Tier 2 (On-Demand LLM Reasoning)*: Deep generative reasoning, policy cross-checking, and response drafting are invoked strictly on-demand by authenticated administrators.
+- **Drafting**: Contextual response drafting grounded on BookLeaf's 13 operating policies using an Anchored Conversation Window (Root Inquiry + last 9 exchanges).
+- **Cost Efficiency**: On-demand execution with ticket-level draft caching and immediate post-send draft cleanup.
 - **Resilience**: Zero-downtime offline heuristic fallback when credentials are unconfigured or provider is unreachable.
 

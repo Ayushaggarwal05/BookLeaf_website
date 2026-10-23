@@ -40,8 +40,17 @@ CATEGORY_CODE_MAP = {
     "PRODUCTION": "Book Status & Production Updates",
     "COVER_DESIGN": "Book Status & Production Updates",
     "BOOK_STATUS_AND_PRODUCTION": "Book Status & Production Updates",
-    "GENERAL_INQUIRY": "General Inquiry",
     "GENERAL": "General Inquiry",
+}
+
+# Reverse mapping from AI/department display strings to standard codes
+REVERSE_CATEGORY_MAP = {
+    "Royalty & Payments": "ROYALTY",
+    "ISBN & Metadata Issues": "METADATA_UPDATE",
+    "Printing & Quality": "PRINT_QUALITY",
+    "Distribution & Availability": "DISTRIBUTION",
+    "Book Status & Production Updates": "COVER_DESIGN",
+    "General Inquiry": "GENERAL_INQUIRY",
 }
 
 # Mapping between AI priority strings and database priority codes

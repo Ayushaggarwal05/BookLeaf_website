@@ -50,13 +50,19 @@ export const AdminDashboardPage: React.FC = () => {
   const urgentTickets = tickets.filter((t) => ['URGENT', 'HIGH'].includes(t.priority) && !['RESOLVED', 'CLOSED'].includes(t.status));
   const unassignedTickets = tickets.filter((t) => !t.assigned_to_id && !['RESOLVED', 'CLOSED'].includes(t.status));
 
+  const [filterMode, setFilterMode] = useState<'active' | 'closed'>('active');
+
+  // Split tickets by resolution state
+  const activeTickets = tickets.filter((t) => !['RESOLVED', 'CLOSED'].includes(t.status));
+  const closedTickets = tickets.filter((t) => ['RESOLVED', 'CLOSED'].includes(t.status));
+
   // Urgent and high priority tickets requiring operational attention
   const priorityTickets = urgentTickets.slice(0, 5);
 
-  // Recent unresolved tickets
-  const recentActiveTickets = tickets
-    .filter((t) => !['RESOLVED', 'CLOSED'].includes(t.status))
-    .slice(0, 6);
+  // Tickets displayed in the activity card based on toggle
+  const displayedRecentTickets = filterMode === 'active'
+    ? activeTickets.slice(0, 6)
+    : closedTickets.slice(0, 6);
 
   if (loading) {
     return <LoadingSpinner size="lg" message="Loading operations metrics..." />;
@@ -206,7 +212,7 @@ export const AdminDashboardPage: React.FC = () => {
 
         {/* Resolved / Closed */}
         <Link 
-          to="/admin/tickets?status=RESOLVED"
+          to="/admin/tickets?status=RESOLVED,CLOSED"
           className="bg-white p-4 rounded-xl border border-cream-300 shadow-soft hover:bg-cream-50 transition block"
         >
           <div className="flex items-center justify-between">
@@ -223,32 +229,58 @@ export const AdminDashboardPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left 2 cols: Active Ticket Queue Preview */}
+        {/* Left 2 cols: Ticket Queue Preview */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-serif font-bold text-brand-950 flex items-center gap-2">
-              <span>Active Support Queue</span>
-              <span className="text-xs font-normal text-gray-500">
-                (Unresolved, newest first)
-              </span>
-            </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-serif font-bold text-brand-950">
+                Support Queue Activity
+              </h2>
+              {/* Filter Tabs */}
+              <div className="flex items-center bg-cream-100 p-0.5 rounded-lg border border-cream-300 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setFilterMode('active')}
+                  className={`px-2.5 py-1 rounded-md font-medium transition cursor-pointer ${
+                    filterMode === 'active'
+                      ? 'bg-white text-brand-950 shadow-xs font-semibold'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Active Queue ({activeTickets.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterMode('closed')}
+                  className={`px-2.5 py-1 rounded-md font-medium transition cursor-pointer ${
+                    filterMode === 'closed'
+                      ? 'bg-white text-brand-950 shadow-xs font-semibold'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Closed Queue ({closedTickets.length})
+                </button>
+              </div>
+            </div>
             <Link
-              to="/admin/tickets"
+              to={filterMode === 'closed' ? '/admin/tickets?status=RESOLVED,CLOSED' : '/admin/tickets'}
               className="text-xs font-semibold text-brand-700 hover:text-brand-900 flex items-center gap-1"
             >
-              <span>View all tickets</span>
+              <span>{filterMode === 'closed' ? 'View all closed' : 'View full queue'}</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
           <div className="bg-white rounded-xl border border-cream-300 shadow-soft divide-y divide-cream-200 overflow-hidden">
-            {recentActiveTickets.length === 0 ? (
+            {displayedRecentTickets.length === 0 ? (
               <div className="p-8 text-center text-xs text-gray-500">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-                All support queues are currently clear! No active unresolved tickets.
+                {filterMode === 'active'
+                  ? 'All support queues are currently clear! No active unresolved tickets.'
+                  : 'No tickets in the closed or resolved queue yet.'}
               </div>
             ) : (
-              recentActiveTickets.map((ticket) => (
+              displayedRecentTickets.map((ticket) => (
                 <Link
                   key={ticket.id}
                   to={`/admin/tickets/${ticket.id}`}
@@ -342,24 +374,48 @@ export const AdminDashboardPage: React.FC = () => {
             )}
           </div>
 
-          {/* AI Integration Placeholder Notice (Section 6) */}
-          <div className="bg-brand-900 text-white rounded-xl p-5 shadow-soft space-y-3">
+          {/* Gemini AI Copilot Operations Card */}
+          <div className="bg-gradient-to-br from-brand-900 to-brand-950 text-white rounded-xl p-5 shadow-soft space-y-3.5 border border-brand-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-emerald-300 text-xs font-semibold uppercase tracking-wider">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 <span>Gemini AI Copilot</span>
               </div>
-              <span className="px-2 py-0.5 rounded bg-brand-800 text-brand-300 text-[10px] font-mono border border-brand-700">
-                Prompt 5 Ready
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 text-[10px] font-mono border border-emerald-800/60 font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Live on Tickets
               </span>
             </div>
 
             <p className="text-xs text-brand-200 leading-relaxed">
-              Automated category classification, priority inference, and AI-suggested draft replies are prepared for activation in Phase 5.
+              Every author inquiry is automatically processed with AI triage and policy-grounded draft replies:
             </p>
 
-            <div className="pt-2 border-t border-brand-800 text-[11px] text-brand-300">
-              Manual triage, status transitions, staff assignment, author responses, and confidential internal notes are fully active.
+            <div className="space-y-2 text-xs text-brand-100">
+              <div className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1 flex-shrink-0"></span>
+                <span><strong>Smart Triage:</strong> Automated category classification and priority confidence scoring.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1 flex-shrink-0"></span>
+                <span><strong>Policy Grounding:</strong> Cross-checks 80/20 royalty formulas, quarterly dates, and print SLAs.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-400 mt-1 flex-shrink-0"></span>
+                <span><strong>1-Click AI Drafts:</strong> Produces empathetic, ready-to-review replies for staff to insert and send.</span>
+              </div>
+            </div>
+
+            <div className="pt-2.5 border-t border-brand-800/80 flex items-center justify-between text-[11px] text-brand-300">
+              <span>Experience inside any ticket view</span>
+              {activeTickets[0] && (
+                <Link
+                  to={`/admin/tickets/${activeTickets[0].id}`}
+                  className="font-medium text-emerald-300 hover:text-white transition flex items-center gap-1 underline underline-offset-2"
+                >
+                  <span>Test on ticket →</span>
+                </Link>
+              )}
             </div>
           </div>
         </div>

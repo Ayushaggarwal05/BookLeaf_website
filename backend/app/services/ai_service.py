@@ -93,6 +93,7 @@ class AiTriageResult(BaseModel):
     created_at: str
     applicable_policies: List[str] = Field(default_factory=list)
     provider: Optional[str] = None
+    error_message: Optional[str] = None
 
     def model_post_init(self, __context: Any) -> None:
         if not self.provider:
@@ -234,11 +235,20 @@ class GeminiService:
 
         except Exception as e:
             logger.warning(f"Gemini triage call failed ({type(e).__name__}): {e}. Applying safe fallback.")
+            err_str = str(e)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
+                user_friendly_error = "Gemini Free Tier Quota Exceeded (20 requests/day limit reached). Deterministic fallback applied."
+            elif "API_KEY_INVALID" in err_str or "401" in err_str or "403" in err_str:
+                user_friendly_error = "Gemini API Key invalid or expired. Deterministic fallback applied."
+            else:
+                user_friendly_error = f"AI provider call encountered an issue ({type(e).__name__}). Safe fallback applied."
+
             return self._heuristic_triage(
                 subject=subject,
                 description=description,
                 status="fallback",
-                reason=f"AI provider call encountered an error. Safe fallback applied.",
+                reason=user_friendly_error,
+                error_message=user_friendly_error,
             )
 
     def generate_draft_response(
@@ -439,11 +449,21 @@ Produce a structured JSON response matching the schema with category, priority, 
         recent_history = ""
         if existing_messages:
             history_lines = []
-            for m in existing_messages[-3:]:  # Bound history context to last 3 entries
-                sender = m.get("sender_type", "USER")
-                body = m.get("message_body", "")[:200]
-                history_lines.append(f"{sender}: {body}")
-            recent_history = f"\nRECENT CONVERSATION CONTEXT:\n" + "\n".join(history_lines)
+            # Anchored Window: If thread is long (> 10 messages), preserve Message #1 as anchor + last 9 messages
+            if len(existing_messages) > 10:
+                first_msg = existing_messages[0]
+                first_sender = f"Author ({author_name})" if first_msg.get("sender_type") == "AUTHOR" else "BookLeaf Support Staff"
+                history_lines.append(f"[{first_sender} - Initial Inquiry]: {first_msg.get('message_body', '').strip()}")
+                history_lines.append(f"... [{len(existing_messages) - 9} intermediate messages omitted for focus] ...")
+                recent_slice = existing_messages[-9:]
+            else:
+                recent_slice = existing_messages
+
+            for m in recent_slice:
+                sender_role = f"Author ({author_name})" if m.get("sender_type") == "AUTHOR" else "BookLeaf Support Staff"
+                body = m.get("message_body", "").strip()
+                history_lines.append(f"[{sender_role}]: {body}")
+            recent_history = f"\nCONVERSATION THREAD (Chronological):\n" + "\n".join(history_lines)
 
         return f"""You are the senior editorial support specialist at BookLeaf Publishing.
 Draft an empathetic, professional, and policy-accurate reply to author '{author_name}'.
@@ -496,6 +516,7 @@ Produce a structured JSON response adhering to the AiDraftOutput schema.
         description: str,
         status: str = "fallback",
         reason: str = "Deterministic fallback",
+        error_message: Optional[str] = None,
     ) -> AiTriageResult:
         """Deterministic keyword-based classification when Gemini is unavailable."""
         combined = f"{subject} {description}".lower()
@@ -525,16 +546,19 @@ Produce a structured JSON response adhering to the AiDraftOutput schema.
             pri = "Medium"
 
         policies = find_relevant_policies(cat)
+        clean_reasoning = f"Matched operational keywords for '{cat}' category based on ticket inquiry."
+
         return AiTriageResult(
             category=cat,
             priority=pri,
             priority_code=PRIORITY_CODE_MAP[pri],
             confidence=0.70,
-            reasoning=f"{reason} (matched keywords for '{cat}').",
+            reasoning=clean_reasoning,
             status=status,
             model="heuristic-fallback",
             provider="heuristic-fallback",
             applicable_policies=policies,
+            error_message=error_message or (reason if status in ("fallback", "unavailable") else None),
             created_at=datetime.now(timezone.utc).isoformat(),
         )
 

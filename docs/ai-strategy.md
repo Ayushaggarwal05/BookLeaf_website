@@ -9,6 +9,9 @@ The integration is built upon production engineering principles:
 - **Official Supported SDK:** Implemented using Google's official Python SDK (`google-genai>=2.30.0`), utilizing native structured JSON schema enforcement (`GenerateContentConfig(response_mime_type="application/json", response_schema=...)`).
 - **Zero-Downtime Fallback Design:** If the Gemini key is unconfigured, rate-limited, or encountering upstream outages, ticket submission and administrative workflows continue seamlessly via deterministic keyword heuristics. Ticket creation never fails due to an AI fault.
 - **Admin-in-the-Loop Workflow:** AI never sends automated external messages to authors. All drafted responses are served as editable proposals for operations staff review. Admin triage overrides are tracked and preserved permanently.
+- **Two-Tier Cost Governance Model:** To prevent API quota exhaustion and bot spam on public-facing endpoints:
+  - **Tier 1 (Zero-Cost Ingestion):** When an author submits a support inquiry, initial categorization and priority routing run on an ultra-fast, deterministic keyword rule engine ($0 API cost, 0 network latency, 0 quota risk).
+  - **Tier 2 (On-Demand Deep LLM Reasoning):** Deep generative reasoning, policy cross-checking, and draft composition are invoked strictly on-demand by authenticated operations administrators clicking *"Generate AI Response Draft"*.
 - **Cost Awareness & Draft Caching:** Draft generation is performed on-demand via explicit admin action rather than background polling. Generated drafts are cached in the ticket's `ai_classification` metadata to avoid redundant API billing.
 
 ---
@@ -71,7 +74,7 @@ The dedicated knowledge base module (`backend/app/services/knowledge_base.py`) c
 ### Focused Context Slicing
 To ensure low latency, minimize token consumption, and avoid hallucinations:
 - Only policies directly relevant to the ticket's active category (plus financial rules if monetary terms appear) are injected into the prompt.
-- Conversation history is strictly bounded to the last 3 messages.
+- **Anchored Conversation History Window:** Rather than unbounded message history, an anchored window passes Message #1 (the root inquiry anchor) plus up to the last 9 chronological exchanges with clear speaker roles (`Author` vs `BookLeaf Support Staff`). This avoids "lost-in-the-middle" token dilution while retaining the complete root problem.
 - Full database dumps or irrelevant author histories are never passed to the LLM.
 
 ---

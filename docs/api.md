@@ -163,10 +163,11 @@ Submit a support ticket.
     ]
   }
   ```
-- **Validation**:
+- **Validation & AI Governance (Tier 1 Ingestion)**:
   - `book_id` is optional (supports account-level tickets).
   - If `book_id` is specified, the system validates that the book belongs to the author (`400 Bad Request` if unowned).
   - Injected fields (`priority`, `status`, `assigned_to_id`, `role`) are discarded; status defaults to `OPEN` and priority to `MEDIUM`.
+  - **Zero-Cost Heuristic Triage**: Ingestion operates strictly under Tier 1 rule heuristics ($0 cost, 0 external network requests, sub-millisecond response) with `status: "rule_engine"`. External Gemini LLM API calls are never triggered on public submission to eliminate DDoS bot spam and quota drain.
 - **Response `201 Created`**: Returns `AuthorTicketResponse`.
 
 ---
@@ -298,10 +299,14 @@ List active administrative staff users for assignment dropdowns.
 ---
 
 #### `POST /api/v1/admin/tickets/{ticket_id}/ai-draft`
-Generate an on-demand AI response draft grounded in BookLeaf operational knowledge base policies.
+Generate an on-demand AI response draft grounded in BookLeaf operational knowledge base policies (Tier 2 Gemini LLM Reasoning).
 
 - **Headers**: `Authorization: Bearer <TOKEN>` (role `admin`)
 - **Query / Body**: None (context is assembled server-side from author profile, book details, and message thread)
+- **Anchored Conversation Window**:
+  - Automatically isolates and preserves Message #1 (`[Author - Initial Inquiry]`) so the foundational author problem statement is never diluted or dropped.
+  - Retains the most recent 9 chronological messages.
+  - If the conversation exceeds 10 messages, inserts an explicit omission indicator: `[... X intermediate messages omitted for context focus ...]` to prevent LLM context saturation and reduce token overhead.
 - **Response `200 OK`**:
   ```json
   {
@@ -319,6 +324,31 @@ Generate an on-demand AI response draft grounded in BookLeaf operational knowled
   }
   ```
 - **Caching**: The generated draft, policy citations, and triage recommendations are cached in `ai_classification` on the ticket record to minimize redundant LLM token expenditures on repeated viewings.
+
+---
+
+#### `POST /api/v1/admin/tickets/{ticket_id}/ai-triage`
+Run on-demand Gemini AI triage (category classification & priority assessment) without generating an author response draft.
+
+- **Headers**: `Authorization: Bearer <TOKEN>` (role `admin`)
+- **Query / Body**: None
+- **Token Efficiency**: Ultra-lightweight prompt (~100 tokens vs. ~500 for a draft response), completing in ~300ms.
+- **Response `200 OK`**:
+  ```json
+  {
+    "category": "Printing & Quality",
+    "priority": "High",
+    "priority_code": "HIGH",
+    "confidence": 0.95,
+    "reasoning": "Author reports 50 defective copies with binding delamination. Aligns with Defect Policy POL-PRT-002.",
+    "status": "success",
+    "model": "gemini-2.5-flash",
+    "created_at": "2026-10-24T00:45:00Z",
+    "applicable_policies": [
+      "Defect Warranty & Free Reprints: Verified defects qualify for expedited free replacement reprint."
+    ]
+  }
+  ```
 
 ---
 

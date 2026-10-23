@@ -17,15 +17,15 @@ The BookLeaf Author Support & Communication Portal was engineered with four over
 - **Trade-off:** A separate database or schema per tenant offers stronger physical isolation but introduces high operational overhead and connection-pooling complexity for hundreds of authors.
 - **Mitigation:** Strict FastAPI dependency validation (`require_author`) and query scoping on every database call prevent cross-tenant record discovery or modification.
 
-### 2.2 Synchronous Triage vs. Background Task Queue (Celery / RQ)
-- **Decision:** Asynchronous inline AI triage wrapped in `try/except` with a fast deterministic fallback.
-- **Trade-off:** Running heavy tasks in Celery or AWS SQS decouples requests from provider latency, but adds operational overhead (Redis broker, worker processes, state polling).
-- **Mitigation:** `gemini-2.5-flash` executes in ~400–800ms. With a strict 30s timeout and instant heuristic fallback on failure, authors experience immediate ticket creation without queue lag.
+### 2.2 Two-Tier AI Governance: Deterministic Ingestion vs. Heavy AI Processing
+- **Decision:** Multi-tier architectural split. Ticket creation operates under **Tier 1 (Zero-Cost Rule Ingestion)** using regex/keyword heuristics ($0 cost, sub-millisecond latency, zero external API dependency). Deep LLM reasoning (`gemini-2.5-flash`) is deferred to **Tier 2 (On-Demand Admin Operations)**.
+- **Trade-off:** Tickets do not receive Gemini's deep contextual reasoning immediately upon author creation.
+- **Benefit & Mitigation:** Eliminates vulnerability to bot spam, denial-of-service quota exhaustion, and runaway API expenses on public/author-facing form submissions. When an authenticated administrator opens the ticket, they can invoke Gemini LLM reasoning and grounded draft generation with an explicit click.
 
-### 2.3 On-Demand Draft Generation vs. Eager Draft Pre-computation
-- **Decision:** Response drafting is triggered **on-demand** by an administrator click rather than pre-generated for every ticket submission.
-- **Trade-off:** The admin must wait ~1–2 seconds when clicking "Generate AI Draft" on a ticket.
-- **Benefit:** Eliminates 80%+ of unnecessary LLM API costs for tickets that admins answer immediately, and avoids running drafts on tickets that are closed or reassigned. Once generated, the draft is cached on the ticket record.
+### 2.3 On-Demand Draft Generation & Anchored Conversation Window
+- **Decision:** Response drafting is triggered **on-demand** by an administrator click rather than pre-generated eagerly for every ticket submission, and leverages an **Anchored Conversation Window** (first initial author inquiry + latest 9 messages).
+- **Trade-off:** The admin must wait ~1–2 seconds when clicking "Generate AI Response Draft" on a ticket.
+- **Benefit:** Eliminates 80%+ of unnecessary LLM API costs for tickets that admins answer immediately, and avoids running drafts on tickets that are closed or reassigned. The Anchored Window prevents context dilution (never forgetting the core issue) without paying token overhead for lengthy intermediate back-and-forths.
 
 ### 2.4 Hybrid Storage (SQLite Dev / PostgreSQL Production)
 - **Decision:** Dual-compatible SQLAlchemy models supporting SQLite for frictionless local development and PostgreSQL for scalable production.

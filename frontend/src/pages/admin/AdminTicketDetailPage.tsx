@@ -15,7 +15,9 @@ import {
   Copy,
   Check,
   ArrowDownToLine,
-  BookOpen
+  BookOpen,
+  Eye,
+  X
 } from 'lucide-react';
 import { api } from '../../services/api';
 import type { 
@@ -43,6 +45,26 @@ const PRIORITIES = [
   { value: 'HIGH', label: 'High' },
   { value: 'URGENT', label: 'Urgent' },
 ];
+
+export const normalizeCategory = (cat?: string): string => {
+  if (!cat) return 'GENERAL_INQUIRY';
+  const c = cat.toUpperCase();
+  if (c.includes('ROYALTY') || c.includes('PAYMENT') || c.includes('PAYOUT') || c.includes('EARNING') || c.includes('PROFIT')) return 'ROYALTY';
+  if (c.includes('PRINT') || c.includes('DEFECT') || c.includes('QUALITY') || c.includes('BINDING')) return 'PRINT_QUALITY';
+  if (c.includes('DISTRIBUT') || c.includes('RETAIL') || c.includes('AVAILABILITY') || c.includes('STOCK') || c.includes('AMAZON') || c.includes('FLIPKART')) return 'DISTRIBUTION';
+  if (c.includes('COVER') || c.includes('DESIGN') || c.includes('PRODUCTION') || c.includes('STATUS')) return 'COVER_DESIGN';
+  if (c.includes('ISBN') || c.includes('METADATA') || c.includes('BARCODE')) return 'METADATA_UPDATE';
+  return 'GENERAL_INQUIRY';
+};
+
+export const normalizePriority = (pri?: string): string => {
+  if (!pri) return 'MEDIUM';
+  const p = pri.toUpperCase();
+  if (p === 'CRITICAL' || p === 'URGENT') return 'URGENT';
+  if (p === 'HIGH') return 'HIGH';
+  if (p === 'LOW') return 'LOW';
+  return 'MEDIUM';
+};
 
 const STATUSES = [
   { value: 'OPEN', label: 'Open' },
@@ -87,12 +109,25 @@ export const AdminTicketDetailPage: React.FC = () => {
   const [noteError, setNoteError] = useState<string | null>(null);
 
   // AI Copilot state
+  const [isRunningAiTriage, setIsRunningAiTriage] = useState<boolean>(false);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState<boolean>(false);
   const [draftResult, setDraftResult] = useState<AiDraftResponse | null>(null);
   const [draftText, setDraftText] = useState<string>('');
   const [aiError, setAiError] = useState<string | null>(null);
   const [isApplyingAiTriage, setIsApplyingAiTriage] = useState<boolean>(false);
   const [copiedDraft, setCopiedDraft] = useState<boolean>(false);
+  const [isPoliciesModalOpen, setIsPoliciesModalOpen] = useState<boolean>(false);
+  const [hasAttemptedTriageInSession, setHasAttemptedTriageInSession] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isPoliciesModalOpen) {
+        setIsPoliciesModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPoliciesModalOpen]);
 
   const isMountedRef = useRef<boolean>(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -111,6 +146,8 @@ export const AdminTicketDetailPage: React.FC = () => {
     if (!silent) {
       setLoading(true);
       setError(null);
+      setAiError(null);
+      setHasAttemptedTriageInSession(false);
     } else {
       setIsRefreshing(true);
     }
@@ -125,10 +162,13 @@ export const AdminTicketDetailPage: React.FC = () => {
         setTicket(ticketData);
         setAdmins(adminsList);
         setSelectedStatus(ticketData.status);
-        setSelectedCategory(ticketData.category);
-        setSelectedPriority(ticketData.priority);
-        setSelectedAssignee(ticketData.assigned_to_id || '');
-        if (ticketData.ai_classification?.draft_response) {
+        setSelectedCategory(normalizeCategory(ticketData.category));
+        setSelectedPriority(normalizePriority(ticketData.priority));
+        const messages = ticketData.messages || [];
+        const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+        const isLastMsgAdmin = lastMsg && lastMsg.sender_type === 'SUPPORT_AGENT';
+
+        if (ticketData.ai_classification?.draft_response && !isLastMsgAdmin) {
           setDraftText((prev) => prev ? prev : (ticketData.ai_classification?.draft_response || ''));
         }
         setLastRefreshedAt(new Date());
@@ -241,6 +281,8 @@ export const AdminTicketDetailPage: React.FC = () => {
 
       setReplyBody('');
       setReplyAttachments([]);
+      setDraftText('');
+      setDraftResult(null);
       showFeedback('Author-visible reply sent successfully.');
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     } catch (err: any) {
@@ -314,6 +356,53 @@ export const AdminTicketDetailPage: React.FC = () => {
     }
   };
 
+  const handleRunAiTriage = async () => {
+    if (!ticket || isRunningAiTriage) return;
+    setIsRunningAiTriage(true);
+    setHasAttemptedTriageInSession(true);
+    setAiError(null);
+    try {
+      const res = await api.admin.runAiTriage(ticket.id);
+      setTicket((prev) => prev ? {
+        ...prev,
+        ai_classification: {
+          ...(prev.ai_classification || {}),
+          category: res.category,
+          priority: res.priority,
+          suggested_category: res.category,
+          suggested_priority: res.priority,
+          priority_code: res.priority_code,
+          confidence: res.confidence,
+          reasoning: res.reasoning,
+          status: res.status,
+          model: res.model,
+          provider: res.model,
+          applicable_policies: res.applicable_policies || [],
+          error_message: res.error_message,
+        }
+      } : null);
+
+      if (res.status === 'success') {
+        setAiError(null);
+        showFeedback(`Gemini AI triage completed: ${res.category} (${res.priority})`, 'success');
+      } else if (res.status === 'fallback') {
+        const fallbackNotice = res.error_message || 'Gemini Quota Exceeded (Free Tier limit: 20 req/day). Safe fallback triage applied.';
+        setAiError(fallbackNotice);
+        showFeedback(fallbackNotice, 'warning');
+      } else {
+        const errorNotice = res.error_message || 'Gemini triage unavailable. Deterministic rule applied.';
+        setAiError(errorNotice);
+        showFeedback(errorNotice, 'error');
+      }
+    } catch (err: any) {
+      const msg = err.message || 'Failed to run Gemini triage.';
+      setAiError(msg);
+      showFeedback(msg, 'error');
+    } finally {
+      setIsRunningAiTriage(false);
+    }
+  };
+
   const handleApplyAiTriage = async () => {
     if (!ticket || isApplyingAiTriage) return;
     setIsApplyingAiTriage(true);
@@ -325,8 +414,8 @@ export const AdminTicketDetailPage: React.FC = () => {
         priority: updated.priority,
         ai_classification: updated.ai_classification || prev.ai_classification
       } : null);
-      setSelectedCategory(updated.category);
-      setSelectedPriority(updated.priority);
+      setSelectedCategory(normalizeCategory(updated.category));
+      setSelectedPriority(normalizePriority(updated.priority));
       showFeedback(`AI triage applied: ${updated.category} (${updated.priority})`);
     } catch (err: any) {
       alert(err.message || 'Failed to apply AI triage.');
@@ -379,6 +468,10 @@ export const AdminTicketDetailPage: React.FC = () => {
       </div>
     );
   }
+
+  const activePolicies: string[] = (draftResult?.relevant_policies && draftResult.relevant_policies.length > 0)
+    ? draftResult.relevant_policies
+    : (ticket.ai_classification?.applicable_policies || []);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -804,7 +897,7 @@ export const AdminTicketDetailPage: React.FC = () => {
                 Category
               </label>
               <select
-                value={selectedCategory}
+                value={normalizeCategory(selectedCategory)}
                 onChange={(e) => setSelectedCategory(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-cream-300 text-xs bg-cream-50 focus:outline-none focus:ring-2 focus:ring-brand-700"
               >
@@ -822,7 +915,7 @@ export const AdminTicketDetailPage: React.FC = () => {
                 Priority
               </label>
               <select
-                value={selectedPriority}
+                value={normalizePriority(selectedPriority)}
                 onChange={(e) => setSelectedPriority(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-cream-300 text-xs bg-cream-50 focus:outline-none focus:ring-2 focus:ring-brand-700"
               >
@@ -837,7 +930,7 @@ export const AdminTicketDetailPage: React.FC = () => {
             <button
               type="button"
               onClick={handleTriageUpdate}
-              disabled={isUpdatingTriage || (selectedCategory === ticket.category && selectedPriority === ticket.priority)}
+              disabled={isUpdatingTriage || (normalizeCategory(selectedCategory) === normalizeCategory(ticket.category) && normalizePriority(selectedPriority) === normalizePriority(ticket.priority))}
               className="w-full px-4 py-2 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-xs font-semibold shadow-soft disabled:opacity-40 transition"
             >
               {isUpdatingTriage ? 'Updating Triage...' : 'Save Triage Overrides'}
@@ -905,195 +998,374 @@ export const AdminTicketDetailPage: React.FC = () => {
           </div>
 
           {/* Gemini AI Copilot Card */}
-          <div className="bg-emerald-50/40 border border-emerald-200/90 rounded-xl p-5 shadow-soft space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-emerald-700" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-950">
-                  Gemini AI Copilot
-                </h3>
-              </div>
-              <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold border border-emerald-300">
-                {draftResult?.model || ticket.ai_classification?.provider || 'gemini-2.5-flash'}
-              </span>
-            </div>
+          {(() => {
+            const currentTriageModel = ticket.ai_classification?.model || ticket.ai_classification?.provider || '';
+            const isGeminiTriage = currentTriageModel.includes('gemini') || (ticket.ai_classification?.status === 'success' && currentTriageModel !== 'rule_engine' && currentTriageModel !== 'heuristic-fallback');
+            const isFallbackTriage = hasAttemptedTriageInSession && (ticket.ai_classification?.status === 'fallback' || currentTriageModel === 'heuristic-fallback');
+            const triageDiffers = ((ticket.ai_classification?.suggested_category && ticket.ai_classification.suggested_category !== ticket.category) ||
+              (ticket.ai_classification?.category && ticket.ai_classification.category !== ticket.category) ||
+              (ticket.ai_classification?.priority_code && ticket.ai_classification.priority_code !== ticket.priority));
 
-            {/* AI Classification & Triage Recommendation */}
-            {(ticket.ai_classification || draftResult) && (
-              <div className="space-y-2 bg-white rounded-lg p-3.5 border border-emerald-200/80 text-xs shadow-soft">
-                <div className="flex items-center justify-between text-[11px] text-gray-500 font-semibold uppercase">
-                  <span>AI Suggested Triage</span>
-                  {(draftResult?.confidence || ticket.ai_classification?.confidence) && (
-                    <span className="font-mono text-emerald-700 font-bold">
-                      {Math.round(((draftResult?.confidence || ticket.ai_classification?.confidence) || 0) * 100)}% Confidence
-                    </span>
-                  )}
-                </div>
+            const displayReasoning = (() => {
+              const r = ticket.ai_classification?.reasoning || '';
+              if (!r || r.includes('AI provider call') || r.includes('Quota Exceeded') || r.includes('encountered an error') || r.includes('limit reached')) {
+                const cat = ticket.ai_classification?.suggested_category || ticket.ai_classification?.category || ticket.category;
+                return `Matched operational keywords for '${cat}' category based on ticket inquiry.`;
+              }
+              return r;
+            })();
 
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-900 border border-emerald-200 font-medium">
-                    Category: <strong>{draftResult?.suggested_category || ticket.ai_classification?.category}</strong>
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-brand-50 text-brand-900 border border-brand-200 font-medium">
-                    Priority: <strong>{draftResult?.suggested_priority || ticket.ai_classification?.priority}</strong>
-                  </span>
-                </div>
-
-                {(draftResult?.reasoning || ticket.ai_classification?.reasoning) && (
-                  <p className="text-[11px] text-gray-600 leading-relaxed pt-1 italic">
-                    "{draftResult?.reasoning || ticket.ai_classification?.reasoning}"
-                  </p>
-                )}
-
-                {ticket.ai_classification?.admin_override && (
-                  <div className="text-[10px] text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200 font-semibold">
-                    Admin override active — AI suggestion preserved separately.
+            return (
+              <div className="bg-emerald-50/40 border border-emerald-200/90 rounded-xl p-5 shadow-soft space-y-5">
+                <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-700" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-950">
+                      Gemini AI Copilot
+                    </h3>
                   </div>
-                )}
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                      isGeminiTriage
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        : isFallbackTriage
+                        ? 'bg-amber-100 text-amber-900 border-amber-300'
+                        : 'bg-amber-100 text-amber-900 border-amber-300'
+                    }`}
+                  >
+                    {isGeminiTriage ? 'gemini-2.5-flash' : isFallbackTriage ? 'fallback (quota limit)' : 'rule_engine (Tier 1)'}
+                  </span>
+                </div>
 
-                {/* Apply AI Triage Button if different */}
-                {((draftResult?.suggested_category && draftResult.suggested_category !== ticket.category) ||
-                  (ticket.ai_classification?.category && ticket.ai_classification.category !== ticket.category) ||
-                  (draftResult?.priority_code && draftResult.priority_code !== ticket.priority)) && (
-                  <div className="pt-2">
+                {/* --- SECTION 1: AI TRIAGE (Queue & Routing Management) --- */}
+                <div className="space-y-3 bg-white rounded-lg p-3.5 border border-emerald-200/80 text-xs shadow-soft">
+                  <div className="flex items-center justify-between text-[11px] text-gray-500 font-semibold uppercase">
+                    <span>{isGeminiTriage ? 'Gemini AI Triage' : isFallbackTriage ? 'Deterministic Fallback Triage' : 'Keyword Ingestion Triage'}</span>
+                    <span
+                      className={`font-mono font-bold ${
+                        isGeminiTriage ? 'text-emerald-700' : 'text-amber-800'
+                      }`}
+                    >
+                      {isGeminiTriage
+                        ? `${Math.round(((ticket.ai_classification?.confidence || draftResult?.confidence) || 0) * 100)}% Confidence`
+                        : isFallbackTriage
+                        ? 'Safe Fallback ($0 Cost)'
+                        : 'Rule Match ($0 Cost)'}
+                    </span>
+                  </div>
+
+                  {/* Category & Priority Cards */}
+                  <div className="grid grid-cols-2 gap-2 pt-0.5">
+                    <div className="p-2.5 rounded-lg bg-emerald-50/80 border border-emerald-200">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">
+                        Category
+                      </span>
+                      <span className="text-xs font-bold text-emerald-950 block mt-0.5 truncate">
+                        {ticket.ai_classification?.suggested_category || ticket.ai_classification?.category || ticket.category}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-brand-50/80 border border-brand-200">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-brand-800 block">
+                        Priority
+                      </span>
+                      <span className="text-xs font-bold text-brand-950 block mt-0.5">
+                        {ticket.ai_classification?.suggested_priority || ticket.ai_classification?.priority || ticket.priority}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Clean Triage Rationale */}
+                  <div className="p-2.5 rounded-lg bg-gray-50 border border-cream-200 text-xs space-y-0.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">
+                      Triage Rationale
+                    </span>
+                    <p className="text-xs text-gray-700 leading-relaxed font-normal">
+                      {displayReasoning}
+                    </p>
+                  </div>
+
+                  {!isGeminiTriage && !isFallbackTriage && (
+                    <p className="text-[10px] text-gray-400">
+                      Initial keyword classification assigned at ticket creation. Run Gemini triage below for deep contextual evaluation.
+                    </p>
+                  )}
+
+                  {ticket.ai_classification?.admin_override && (
+                    <div className="text-[10px] text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200 font-semibold">
+                      Admin override active — AI suggestion preserved separately.
+                    </div>
+                  )}
+
+                  {/* Dedicated Action Button 1: Run Gemini Triage */}
+                  <div className="pt-2 space-y-2">
                     <button
                       type="button"
-                      onClick={handleApplyAiTriage}
-                      disabled={isApplyingAiTriage}
-                      className="w-full px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-semibold transition flex items-center justify-center gap-1.5 shadow-soft disabled:opacity-50"
+                      onClick={handleRunAiTriage}
+                      disabled={isRunningAiTriage}
+                      className="w-full px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-soft disabled:opacity-50 cursor-pointer"
                     >
-                      {isApplyingAiTriage ? (
+                      {isRunningAiTriage ? (
                         <>
                           <LoadingSpinner size="sm" />
-                          <span>Applying Triage...</span>
+                          <span>Analyzing Triage with Gemini...</span>
                         </>
                       ) : (
                         <>
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Apply AI Triage to Ticket</span>
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-200" />
+                          <span>{isGeminiTriage ? 'Re-run Gemini AI Triage' : isFallbackTriage ? 'Retry Gemini AI Triage' : 'Run Gemini AI Triage'}</span>
                         </>
                       )}
                     </button>
+
+                    {/* Apply Triage Button or Match confirmation */}
+                    {triageDiffers ? (
+                      <button
+                        type="button"
+                        onClick={handleApplyAiTriage}
+                        disabled={isApplyingAiTriage}
+                        className="w-full px-3 py-2 rounded-lg bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-soft disabled:opacity-50 cursor-pointer"
+                      >
+                        {isApplyingAiTriage ? (
+                          <>
+                            <LoadingSpinner size="sm" />
+                            <span>Applying Triage...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Apply Suggested Triage to Ticket</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-emerald-50/80 border border-emerald-200/80 text-[11px] font-semibold text-emerald-900 text-center">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                        <span>Ticket classification matches suggested triage</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Single Consolidated Notice Banner (Only shown if user attempted triage in session or draft error) */}
+                {((hasAttemptedTriageInSession && isFallbackTriage) || (aiError && aiError !== 'fallback')) && (
+                  <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-200/90 text-xs text-amber-900 flex items-start gap-2.5 shadow-soft">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-0.5 flex-1">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-amber-950">
+                        {isFallbackTriage ? 'Rule Engine Fallback Active' : 'AI Service Notice'}
+                      </div>
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        {isFallbackTriage
+                          ? 'Google Gemini Free Tier daily limit reached (429). The system safely applied deterministic keyword triage ($0 cost) so routing continues without interruption.'
+                          : aiError}
+                      </p>
+                    </div>
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* AI Error / Unavailable Banner */}
-            {aiError && (
-              <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-xs text-rose-800 space-y-1">
-                <div className="flex items-center gap-1.5 font-bold text-rose-900">
-                  <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-                  <span>AI Service Notice</span>
-                </div>
-                <p className="text-[11px] text-rose-700 leading-relaxed">{aiError}</p>
-                <p className="text-[10px] text-gray-500">
-                  You can compose and send a manual response below without AI assistance.
-                </p>
-              </div>
-            )}
-
-            {/* Relevant Policies Context */}
-            {((draftResult?.relevant_policies && draftResult.relevant_policies.length > 0) ||
-              (ticket.ai_classification?.applicable_policies && ticket.ai_classification.applicable_policies.length > 0)) && (
-              <div className="space-y-1 text-xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1">
-                  <BookOpen className="w-3 h-3 text-emerald-700" />
-                  Referenced Operating Policies
-                </span>
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {(draftResult?.relevant_policies || ticket.ai_classification?.applicable_policies || []).map((policy: string, idx: number) => (
-                    <span
-                      key={idx}
-                      className="px-2 py-0.5 rounded-full bg-white text-emerald-900 text-[10px] border border-emerald-200 shadow-soft"
+                {/* Relevant Policies Context - Cohesive Card with View Modal Button */}
+                {activePolicies.length > 0 && (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white border border-emerald-200 shadow-soft">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-800 flex-shrink-0">
+                        <BookOpen className="w-3.5 h-3.5 text-emerald-700" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-brand-950 flex items-center gap-1.5">
+                          <span className="truncate">Operating Policies</span>
+                          <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex-shrink-0">
+                            {activePolicies.length}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 truncate">Cited guidelines for this ticket</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsPoliciesModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-semibold transition cursor-pointer shadow-soft flex-shrink-0 ml-2"
+                      title="View cited operating policies in modal"
                     >
-                      {policy}
+                      <Eye className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>View</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* --- SECTION 2: AI DRAFT RESPONSE (Author Communication) --- */}
+                <div className="pt-2 border-t border-emerald-200 space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <label className="text-[11px] font-bold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Author Reply Draft</span>
+                    </label>
+                    <span className="text-[10px] text-gray-400">
+                      Staff review required
                     </span>
-                  ))}
+                  </div>
+
+                  {draftText ? (
+                    <div className="space-y-2">
+                      <textarea
+                        rows={6}
+                        value={draftText}
+                        onChange={(e) => setDraftText(e.target.value)}
+                        placeholder="AI-generated draft proposal..."
+                        className="w-full rounded-lg border border-emerald-300 p-3 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 font-sans leading-relaxed transition resize-y shadow-soft"
+                      />
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleInsertDraftIntoReply}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-soft transition"
+                          title="Insert this draft into author response composer"
+                        >
+                          <ArrowDownToLine className="w-3.5 h-3.5" />
+                          <span>Insert into Response</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleCopyDraft}
+                          className="px-3 py-2 rounded-lg bg-white hover:bg-cream-100 text-gray-700 border border-cream-300 text-xs font-semibold shadow-soft transition inline-flex items-center gap-1"
+                          title="Copy draft to clipboard"
+                        >
+                          {copiedDraft ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              <span className="text-emerald-700">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5 text-gray-500" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-white/70 rounded-lg border border-emerald-200/80 text-[11px] text-emerald-900 flex items-start gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                      <p>
+                        Click <strong>Generate AI Response Draft</strong> below whenever you want Gemini to analyze the conversation thread and compose an empathetic, policy-grounded reply.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Dedicated Action Button 2: Generate Draft */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={handleGenerateAiDraft}
+                      disabled={isGeneratingDraft}
+                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-white hover:bg-cream-100 text-emerald-900 border border-emerald-300 text-xs font-semibold shadow-soft disabled:opacity-50 transition"
+                    >
+                      {isGeneratingDraft ? (
+                        <>
+                          <LoadingSpinner size="sm" />
+                          <span>Consulting BookLeaf Policy & Drafting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{draftText ? 'Regenerate AI Response Draft' : 'Generate AI Response Draft'}</span>
+                        </>
+                      )}
+                    </button>
+                    <p className="text-[10px] text-gray-400 text-center mt-1.5">
+                      Grounds draft on official BookLeaf royalty, printing, distribution, and production policies.
+                    </p>
+                  </div>
                 </div>
               </div>
-            )}
+            );
+          })()}
+        </div>
+      </div>
 
-            {/* Editable AI Draft Section */}
-            {draftText ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <label className="text-[11px] font-bold text-emerald-950 uppercase tracking-wider">
-                    Editable Draft for Staff Review
-                  </label>
-                  <span className="text-[10px] text-gray-400">
-                    Never auto-sent to author
-                  </span>
+      {/* Operating Policies Modal */}
+      {isPoliciesModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={() => setIsPoliciesModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-xl border border-cream-300 max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-cream-200 flex items-center justify-between bg-emerald-50/70">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-800">
+                  <BookOpen className="w-4 h-4 text-emerald-700" />
                 </div>
-
-                <textarea
-                  rows={6}
-                  value={draftText}
-                  onChange={(e) => setDraftText(e.target.value)}
-                  placeholder="AI-generated draft proposal..."
-                  className="w-full rounded-lg border border-emerald-300 p-3 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 font-sans leading-relaxed transition resize-y shadow-soft"
-                />
-
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleInsertDraftIntoReply}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-soft transition"
-                    title="Insert this draft into author response composer"
-                  >
-                    <ArrowDownToLine className="w-3.5 h-3.5" />
-                    <span>Insert into Response</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleCopyDraft}
-                    className="px-3 py-2 rounded-lg bg-white hover:bg-cream-100 text-gray-700 border border-cream-300 text-xs font-semibold shadow-soft transition inline-flex items-center gap-1"
-                    title="Copy draft to clipboard"
-                  >
-                    {copiedDraft ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="text-emerald-700">Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 text-gray-500" />
-                        <span>Copy</span>
-                      </>
-                    )}
-                  </button>
+                <div>
+                  <h3 className="text-sm font-bold text-brand-950">
+                    Referenced Operating Policies
+                  </h3>
+                  <p className="text-[11px] text-gray-500">
+                    Official BookLeaf operational rules cited for this ticket ({activePolicies.length})
+                  </p>
                 </div>
               </div>
-            ) : null}
-
-            {/* Generate / Regenerate Action Button */}
-            <div>
               <button
                 type="button"
-                onClick={handleGenerateAiDraft}
-                disabled={isGeneratingDraft}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-white hover:bg-cream-100 text-emerald-900 border border-emerald-300 text-xs font-semibold shadow-soft disabled:opacity-50 transition"
+                onClick={() => setIsPoliciesModalOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-cream-100 transition cursor-pointer"
+                aria-label="Close modal"
               >
-                {isGeneratingDraft ? (
-                  <>
-                    <LoadingSpinner size="sm" />
-                    <span>Consulting BookLeaf Policy & Drafting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>{draftText ? 'Regenerate AI Draft' : 'Generate AI Response Draft'}</span>
-                  </>
-                )}
+                <X className="w-4 h-4" />
               </button>
-              <p className="text-[10px] text-gray-400 text-center mt-1.5">
-                Grounds draft on official BookLeaf royalty, printing, distribution, and production policies.
-              </p>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto space-y-3">
+              {activePolicies.map((policy: string, idx: number) => {
+                const colonIdx = policy.indexOf(':');
+                const hasTitle = colonIdx > 0 && colonIdx < 50;
+                const title = hasTitle ? policy.slice(0, colonIdx) : null;
+                const body = hasTitle ? policy.slice(colonIdx + 1).trim() : policy;
+
+                return (
+                  <div key={idx} className="p-3.5 rounded-lg bg-cream-50/80 border border-cream-200 space-y-1">
+                    {title ? (
+                      <>
+                        <div className="text-xs font-bold text-brand-900 flex items-center gap-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                          <span>{title}</span>
+                        </div>
+                        <p className="text-xs text-gray-700 leading-relaxed pl-5">
+                          {body}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-700 leading-relaxed">
+                        {policy}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 border-t border-cream-200 bg-gray-50 flex items-center justify-between">
+              <span className="text-[11px] text-gray-400">
+                BookLeaf Publishing Operational Knowledge Base
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsPoliciesModalOpen(false)}
+                className="px-4 py-1.5 rounded-lg bg-brand-800 hover:bg-brand-900 text-white text-xs font-semibold shadow-soft transition cursor-pointer"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -216,3 +216,6 @@ class AiTriageResponse(BaseModel):
     status: str
     model: str
     created_at: str
+    applicable_policies: List[str] = []
+    error_message: Optional[str] = None
+

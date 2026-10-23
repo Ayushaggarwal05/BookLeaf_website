@@ -13,7 +13,8 @@ import type {
   AdminTicketFilters, 
   AdminUserSummary,
   TicketInternalNote,
-  AiDraftResponse
+  AiDraftResponse,
+  AiTriageResponse
 } from '../types/admin';
 
 // Read API base URL from environment or fall back to standard local backend
@@ -190,6 +191,12 @@ export const api = {
 
     generateAiDraft: (ticketId: string): Promise<AiDraftResponse> => {
       return request<AiDraftResponse>(`/admin/tickets/${ticketId}/ai-draft`, {
+        method: 'POST',
+      });
+    },
+
+    runAiTriage: (ticketId: string): Promise<AiTriageResponse> => {
+      return request<AiTriageResponse>(`/admin/tickets/${ticketId}/ai-triage`, {
         method: 'POST',
       });
     },

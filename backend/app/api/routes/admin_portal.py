@@ -60,10 +60,15 @@ def list_all_tickets_admin(
     conditions = []
 
     if status_filter:
-        conditions.append(SupportTicket.status == status_filter.upper())
+        statuses = [s.strip().upper() for s in status_filter.split(",") if s.strip()]
+        if len(statuses) == 1:
+            conditions.append(SupportTicket.status == statuses[0])
+        elif len(statuses) > 1:
+            conditions.append(SupportTicket.status.in_(statuses))
 
     if category:
         conditions.append(SupportTicket.category == category)
+
 
     if priority:
         conditions.append(SupportTicket.priority == priority.upper())
@@ -361,6 +366,75 @@ def generate_ticket_ai_draft(
         model=draft_result.model,
         error_message=draft_result.error_message,
         created_at=draft_result.created_at,
+    )
+
+
+@router.post("/tickets/{ticket_id}/ai-triage", response_model=AiTriageResponse, summary="Run On-Demand Gemini AI Triage Analysis")
+def run_ticket_ai_triage(
+    ticket_id: str,
+    current_admin: AuthenticatedUser = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    On-demand Gemini LLM ticket classification and priority assessment.
+    - Evaluates author query against official BookLeaf operational departments.
+    - Replaces initial Tier 1 keyword triage with deep Gemini 2.5 Flash reasoning.
+    - Caches suggested category and priority on ticket record for administrative review.
+    """
+    stmt = (
+        select(SupportTicket)
+        .options(
+            joinedload(SupportTicket.author),
+            joinedload(SupportTicket.book),
+            selectinload(SupportTicket.messages),
+        )
+        .where(SupportTicket.id == ticket_id)
+    )
+    ticket = db.scalars(stmt).first()
+    if not ticket:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Ticket '{ticket_id}' was not found.")
+
+    author = ticket.author
+    book = ticket.book
+
+    triage_result = ai_service.triage_ticket(
+        subject=ticket.subject,
+        description=ticket.description,
+        author_name=author.name if author else None,
+        book_title=book.title if book else None,
+        book_isbn=book.isbn if book else None,
+    )
+
+    # Cache Gemini AI triage in ai_classification on ticket
+    ai_meta = dict(ticket.ai_classification or {})
+    ai_meta["category"] = triage_result.category
+    ai_meta["priority"] = triage_result.priority
+    ai_meta["suggested_category"] = triage_result.category
+    ai_meta["suggested_priority"] = triage_result.priority
+    ai_meta["priority_code"] = triage_result.priority_code
+    ai_meta["confidence"] = triage_result.confidence
+    ai_meta["reasoning"] = triage_result.reasoning
+    ai_meta["status"] = triage_result.status
+    ai_meta["model"] = triage_result.model
+    ai_meta["provider"] = triage_result.provider or triage_result.model
+    ai_meta["applicable_policies"] = triage_result.applicable_policies
+    ai_meta["triage_analyzed_at"] = triage_result.created_at
+    ai_meta["error_message"] = triage_result.error_message
+    ticket.ai_classification = ai_meta
+    db.commit()
+    db.refresh(ticket)
+
+    return AiTriageResponse(
+        category=triage_result.category,
+        priority=triage_result.priority,
+        priority_code=triage_result.priority_code,
+        confidence=triage_result.confidence,
+        reasoning=triage_result.reasoning,
+        status=triage_result.status,
+        model=triage_result.model,
+        created_at=triage_result.created_at,
+        applicable_policies=triage_result.applicable_policies,
+        error_message=triage_result.error_message,
     )
 
 

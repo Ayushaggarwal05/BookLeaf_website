@@ -154,3 +154,17 @@ def test_admin_portal_lifecycle_and_security():
     # 14. Non-existent ticket returns 404
     non_existent = client.get('/api/v1/admin/tickets/TCK_NONEXISTENT_9999', headers=admin_headers)
     assert non_existent.status_code == 404
+
+    # 15. Admin triggers on-demand Gemini AI triage
+    ai_triage_res = client.post(f'/api/v1/admin/tickets/{ticket_id}/ai-triage', headers=admin_headers)
+    assert ai_triage_res.status_code == 200
+    ai_triage_data = ai_triage_res.json()
+    assert 'category' in ai_triage_data
+    assert 'priority' in ai_triage_data
+    assert 'confidence' in ai_triage_data
+    assert 'reasoning' in ai_triage_data
+
+    # Security check: Author CANNOT run AI triage
+    author_ai_triage = client.post(f'/api/v1/admin/tickets/{ticket_id}/ai-triage', headers=author_headers)
+    assert author_ai_triage.status_code == 403
+
