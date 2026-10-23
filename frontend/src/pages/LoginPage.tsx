@@ -49,17 +49,21 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-cream-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        {/* Brand Header */}
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-700 text-white shadow-card mb-4">
-          <BookOpen className="w-7 h-7 text-brand-100" />
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        {/* Brand Header: Logo and Title side-by-side */}
+        <div className="flex items-center justify-center gap-3.5 mb-2">
+          <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-brand-700 text-white shadow-card flex-shrink-0">
+            <BookOpen className="w-6 h-6 text-brand-100" />
+          </div>
+          <div className="text-left">
+            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-brand-950 tracking-tight leading-none">
+              BookLeaf
+            </h1>
+            <p className="mt-1 text-xs sm:text-sm text-brand-800 font-medium">
+              Author Support & Royalty Portal
+            </p>
+          </div>
         </div>
-        <h1 className="text-3xl font-serif font-bold text-brand-950 tracking-tight">
-          BookLeaf
-        </h1>
-        <p className="mt-1 text-sm text-brand-800 font-medium">
-          Author Support & Royalty Portal
-        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">

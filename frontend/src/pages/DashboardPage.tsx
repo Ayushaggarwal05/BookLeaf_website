@@ -234,7 +234,7 @@ export const DashboardPage: React.FC = () => {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] font-mono text-gray-400 font-medium">{ticket.ticket_number}</span>
-                    <StatusBadge type="ticket_status" value={ticket.status} />
+                    <StatusBadge type="ticket_status" value={ticket.status} perspective="author" />
                   </div>
                   <h4 className="text-sm font-medium text-gray-900 truncate">{ticket.subject}</h4>
                   <div className="text-[11px] text-gray-500 flex items-center justify-between">

@@ -5,9 +5,10 @@ export interface StatusBadgeProps {
   value?: string;
   status?: string;
   size?: 'sm' | 'md';
+  perspective?: 'admin' | 'author';
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ type, value, status, size = 'sm' }) => {
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ type, value, status, size = 'sm', perspective = 'admin' }) => {
   const badgeValue = (value || status || '').trim();
   const sizeClasses = size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-sm';
 
@@ -22,7 +23,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ type, value, status, s
         style: 'bg-sky-50 text-sky-800 border border-sky-200',
       },
       WAITING_ON_AUTHOR: {
-        label: 'Awaiting Your Reply',
+        label: perspective === 'author' ? 'Awaiting Your Reply' : 'Awaiting Author Reply',
         style: 'bg-amber-50 text-amber-900 border border-amber-300 font-semibold',
       },
       RESOLVED: {

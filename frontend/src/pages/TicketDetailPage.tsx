@@ -256,7 +256,7 @@ export const TicketDetailPage: React.FC = () => {
             <span className="text-gray-500 block text-[11px] uppercase tracking-wider mb-1">
               Current Status
             </span>
-            <StatusBadge status={ticket.status} type="ticket" />
+            <StatusBadge status={ticket.status} type="ticket" perspective="author" />
           </div>
 
           <div>

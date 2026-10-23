@@ -200,7 +200,7 @@ export const AdminDashboardPage: React.FC = () => {
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-800">
-              Awaiting Author
+              Awaiting Author Reply
             </span>
             <User className="w-4 h-4 text-amber-600" />
           </div>

@@ -285,7 +285,7 @@ export const TicketsPage: React.FC = () => {
 
                     {/* Status */}
                     <td className="py-4 px-4">
-                      <StatusBadge status={ticket.status} type="ticket" />
+                      <StatusBadge status={ticket.status} type="ticket" perspective="author" />
                     </td>
 
                     {/* Dates */}
@@ -324,7 +324,7 @@ export const TicketsPage: React.FC = () => {
                   <span className="font-mono font-medium text-xs text-brand-800">
                     {ticket.ticket_number}
                   </span>
-                  <StatusBadge status={ticket.status} type="ticket" />
+                  <StatusBadge status={ticket.status} type="ticket" perspective="author" />
                 </div>
                 <h4 className="font-medium text-brand-950 text-sm mb-1">
                   {ticket.subject}
