@@ -32,6 +32,19 @@ The BookLeaf Author Support & Communication Portal was engineered with four over
 - **Trade-off:** SQLite lacks native JSON and sequence types present in Postgres.
 - **Mitigation:** SQLite foreign keys are explicitly enforced via connection PRAGMAs (`PRAGMA foreign_keys=ON`). JSON metadata is serialized consistently across both engines, and Alembic migrations target universal SQL types.
 
+### 2.5 Real-Time Synchronization: Heartbeat Polling vs. WebSockets
+- **Decision:** Implemented client-side short-polling (10-second conversation heartbeat, 15-second queue refresh) backed by optimistic UI updates.
+- **Trade-off:** Slightly higher HTTP request count compared to an open, persistent bidirectional TCP socket stream.
+- **Rationale & Resilience:** 
+  - Free-tier hosted web services (like Render) spin down or recycle worker dynos during inactive periods, which forcibly severs persistent WebSocket connections and causes high reconnect churn.
+  - Short polling is stateless, HTTP/2 multiplexed, and immune to mobile sleep/wake connection drops.
+  - For support ticket conversations, a 10-second polling cadence provides near-instantaneous perceived responsiveness with zero stateful connection management overhead on the server.
+
+### 2.6 Cloud Routing: Supabase IPv4 Connection Pooler vs. Direct IPv6
+- **Decision:** Routed production PostgreSQL traffic through Supabase's transaction pooler (`aws-0-ap-south-1.pooler.supabase.com:5432`) rather than direct endpoint `db.[REF].supabase.co`.
+- **Trade-off:** Adds a single intermediate pooling hop via PgBouncer.
+- **Rationale:** Direct Supabase endpoints resolve exclusively to IPv6 addresses in certain AWS regions. Because free-tier Render and common Linux container runtimes lack native dual-stack IPv6 egress routing (`Network is unreachable`), utilizing the dedicated IPv4 pooler ensures guaranteed network reachability and connection persistence across global container boundaries.
+
 ---
 
 ## 3. Production Evolution & Next Steps

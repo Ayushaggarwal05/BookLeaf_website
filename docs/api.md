@@ -4,10 +4,12 @@
 
 The BookLeaf Author Support Portal REST API is versioned under `/api/v1/`. It enforces **zero-trust authentication** and **author-level tenant isolation**.
 
-- **Base URL**: `http://127.0.0.1:8000`
-- **Interactive Documentation**: `http://127.0.0.1:8000/docs` (Swagger UI)
-- **Alternative Documentation**: `http://127.0.0.1:8000/redoc` (ReDoc)
-- **Protocol**: JSON over HTTP/1.1 or HTTP/2
+- **Live Production Base URL**: `https://bookleaf-backend-dcy8.onrender.com`
+- **Live Interactive Swagger UI**: [https://bookleaf-backend-dcy8.onrender.com/docs](https://bookleaf-backend-dcy8.onrender.com/docs)
+- **Live Alternative Docs (ReDoc)**: [https://bookleaf-backend-dcy8.onrender.com/redoc](https://bookleaf-backend-dcy8.onrender.com/redoc)
+- **Live Health Endpoint**: [https://bookleaf-backend-dcy8.onrender.com/health](https://bookleaf-backend-dcy8.onrender.com/health)
+- **Local Development Base URL**: `http://127.0.0.1:8000`
+- **Protocol**: JSON over HTTPS / HTTP/1.1
 - **Authentication**: JWT Bearer token via `Authorization: Bearer <TOKEN>`
 
 ---

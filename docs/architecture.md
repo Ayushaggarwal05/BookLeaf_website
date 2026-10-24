@@ -208,3 +208,43 @@ Implemented in `backend/app/services/ai_service.py` and `knowledge_base.py`:
 - **Cost Efficiency**: On-demand execution with ticket-level draft caching and immediate post-send draft cleanup.
 - **Resilience**: Zero-downtime offline heuristic fallback when credentials are unconfigured or provider is unreachable.
 
+---
+
+## 10. Live Production Cloud Topology & Hosting Architecture
+
+```
+                    ┌───────────────────────────┐
+                    │  Author & Admin Browsers  │
+                    └─────────────┬─────────────┘
+                                  │ HTTPS
+                                  ▼
+                    ┌───────────────────────────┐
+                    │   Vercel Global Edge CDN  │
+                    │ (React 19 + TypeScript)   │
+                    │   book-leaf-website-five  │
+                    └─────────────┬─────────────┘
+                                  │ REST API / JWT
+                                  ▼
+                    ┌───────────────────────────┐
+                    │    Render Web Service     │
+                    │ (FastAPI + SQLAlchemy 2)  │
+                    │   bookleaf-backend-dcy8   │
+                    └──────┬──────────────┬─────┘
+                           │              │
+           SQLAlchemy 2.x  │              │ Google GenAI SDK
+           (IPv4 Pooler)   │              │
+                           ▼              ▼
+     ┌───────────────────────────┐  ┌───────────────────────────┐
+     │   Supabase PostgreSQL     │  │   Google Gemini AI        │
+     │  (AWS ap-south-1 Mumbai)  │  │   (gemini-2.5-flash)      │
+     │  Relational Storage       │  │   Policy Triage & Drafts  │
+     └───────────────────────────┘  └───────────────────────────┘
+```
+
+### Infrastructure Highlights:
+1. **Frontend (Vercel)**: Single Page Application deployed to Vercel's global CDN with `vercel.json` rewrite routing. Zero cold starts and sub-50ms asset delivery.
+2. **Backend (Render)**: Python 3.11 FastAPI web service in Oregon with automated health check monitoring (`/health`).
+3. **Database (Supabase PostgreSQL)**: Fully managed relational database hosted in AWS Mumbai (`ap-south-1`). Connects via Supabase IPv4 transaction pooler on port 5432 with auto-reconnecting connection pool.
+4. **AI Provider (Google Gemini)**: Direct server-to-server TLS integration with Gemini 2.5 Flash, completely isolating the API key from public exposure.
+5. **Real-Time Heartbeat**: 10s short-polling interval on ticket detail conversations and 15s interval on queues ensures continuous synchronization without the memory leak or disconnection risks of WebSockets on free-tier infrastructure.
+
