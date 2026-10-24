@@ -4,6 +4,25 @@ Production-minded full-stack support and publishing portal for authors and suppo
 
 ---
 
+## 🚀 Live Production Deployments
+
+| Component | Provider | Live URL | Description |
+| :--- | :--- | :--- | :--- |
+| **Frontend Web App** | Vercel | [https://book-leaf-website-five.vercel.app](https://book-leaf-website-five.vercel.app) | React 19 + TypeScript + Vite responsive portal |
+| **Backend REST API** | Render | [https://bookleaf-backend-dcy8.onrender.com](https://bookleaf-backend-dcy8.onrender.com) | FastAPI 0.115+ web service with Supabase DB |
+| **Interactive API Docs** | Render | [https://bookleaf-backend-dcy8.onrender.com/docs](https://bookleaf-backend-dcy8.onrender.com/docs) | Swagger UI for interactive API exploration |
+| **Health Check** | Render | [https://bookleaf-backend-dcy8.onrender.com/health](https://bookleaf-backend-dcy8.onrender.com/health) | System & database connectivity status |
+
+### 🔑 Demo Accounts for Live Evaluation
+
+| Role | Email | Password | Access & Features |
+| :--- | :--- | :--- | :--- |
+| **Operations Admin** | `admin@bookleaf.in` | `Admin@BookLeaf2026!` | Cross-author triage queues, Gemini AI response drafting & triage, internal notes |
+| **Author (AUTH001)** | `priya.sharma@email.com` | `Author@BookLeaf2026!` | Book catalog (3 titles), royalty ledger, ticket submissions & conversations |
+| **Author (AUTH002)** | `rohit.kapoor@email.com` | `Author@BookLeaf2026!` | Book catalog (2 titles), royalty ledger, ticket submissions & conversations |
+
+---
+
 ## Project Structure
 
 ```
