@@ -6,6 +6,7 @@ and context-aware response drafting using the BookLeaf knowledge base.
 Implements bounded retries, graceful fallbacks, and strict secret hygiene.
 """
 
+import re
 import json
 import logging
 from datetime import datetime, timezone
@@ -60,7 +61,10 @@ class AiDraftOutput(BaseModel):
     """Structured output expected from Gemini for author response drafting."""
     draft_response: str = Field(
         ...,
-        description="Empathetic, professional draft response adhering strictly to BookLeaf knowledge base policies.",
+        description=(
+            "Empathetic, concise draft response (75-120 words across 2 short paragraphs) "
+            "formatted with clean double newlines (\\n\\n) between greeting, body paragraphs, and sign-off."
+        ),
     )
     suggested_category: str = Field(
         ...,
@@ -359,8 +363,13 @@ class GeminiService:
             sug_pri = normalize_priority(parsed_output.suggested_priority)
             pri_code = PRIORITY_CODE_MAP.get(sug_pri, "MEDIUM")
 
+            formatted_draft = self._format_draft_response(
+                parsed_output.draft_response,
+                author_name or "Author"
+            )
+
             return AiDraftResult(
-                draft_response=parsed_output.draft_response.strip(),
+                draft_response=formatted_draft,
                 suggested_category=sug_cat,
                 suggested_priority=sug_pri,
                 priority_code=pri_code,
@@ -496,16 +505,73 @@ AUTHOR & TICKET CONTEXT:
 - Priority: {priority}
 {recent_history}
 
-FORMATTING RULES:
-1. Greet the author warmly: 'Dear {author_name},'
-2. Directly answer their query using the guidelines and operating policies above.
-3. Do NOT fabricate fake banking reference numbers or false claim dates.
-4. Sign off professionally:
-Warm regards,
-BookLeaf Author Support Team
+DRAFT CONCISENESS & FORMATTING RULES (STRICT):
+1. LENGTH: Keep the reply brief, crisp, and under 110 words across exactly 2 short paragraphs. Do NOT repeat yourself or write lengthy corporate filler.
+2. PARAGRAPH BREAKS: Structure the response with clear double newlines (`\n\n`) between every section:
+   - Line 1: 'Dear {author_name},\n\n'
+   - Paragraph 1: Direct empathetic acknowledgment and genuine ownership of the concern.
+   - Paragraph 2: Specific policy solution, the exact next step needed from the author, and the turnaround time (e.g. 5-7 business days or 48 hours).
+   - Sign-off: MUST be separated by a blank line (`\n\n`) with the team name on its own line:
+     '\n\nWarm regards,\nBookLeaf Author Support Team'
+3. Do NOT run sentences together without spaces or line breaks.
+4. Do NOT fabricate fake banking reference numbers or false claim dates.
 
 Produce a structured JSON response adhering to the AiDraftOutput schema.
 """
+
+    @staticmethod
+    def _format_draft_response(draft: str, author_name: str) -> str:
+        """Format and normalize draft text ensuring proper paragraph spacing and clean sign-off."""
+        if not draft:
+            return ""
+
+        text = draft.strip().replace("\r\n", "\n")
+
+        # 1. Fix missing space after periods before uppercase letters (e.g. 'seriously.BookLeaf' -> 'seriously. BookLeaf')
+        text = re.sub(r'([a-z0-9\)])\.([A-Z])', r'\1. \2', text)
+
+        # 2. Greeting normalization: ensure 'Dear <Name>,\n\n'
+        g_match = re.match(r'^(Dear\s+[^,\.\n]+[,\.]?)\s*', text, re.IGNORECASE)
+        if g_match:
+            greeting = g_match.group(1).rstrip('.,') + ','
+            rest = text[g_match.end():].lstrip()
+            text = f"{greeting}\n\n{rest}"
+        elif not text.lower().startswith("dear "):
+            text = f"Dear {author_name},\n\n{text}"
+
+        # 3. Sign-off normalization: ensure clean '\n\nWarm regards,\nBookLeaf Author Support Team'
+        s_match = re.search(
+            r'[\.\!\?]?\s*(Warm regards|Best regards|Kind regards|Regards|Sincerely)[,\.]?\s*(BookLeaf[^\n]*)?$',
+            text,
+            re.IGNORECASE
+        )
+        if s_match:
+            start_idx = s_match.start(1)
+            body = text[:start_idx].rstrip(' .,!?') + '.'
+            signoff_type = s_match.group(1).capitalize()
+            team = (s_match.group(2) or 'BookLeaf Author Support Team').strip()
+            if not team:
+                team = 'BookLeaf Author Support Team'
+
+            # If body has no paragraph breaks, break before transition phrases to maintain readable paragraphs
+            if "\n\n" not in body:
+                action_split = re.search(
+                    r'(\.\s+)(To initiate|To proceed|Please provide|Please share|Please send|In order to|Our team has|We will look into)',
+                    body,
+                    re.IGNORECASE
+                )
+                if action_split:
+                    idx = action_split.start(1)
+                    body = body[:idx + 1] + "\n\n" + body[action_split.start(2):]
+
+            text = f"{body}\n\n{signoff_type},\n{team}"
+        else:
+            if "BookLeaf" not in text[-50:]:
+                text = f"{text}\n\nWarm regards,\nBookLeaf Author Support Team"
+
+        # 4. Collapse 3+ consecutive newlines to double newlines (\n\n)
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        return text.strip()
 
     def _parse_json_safely(self, raw_text: str, schema_cls):
         """Extract and validate JSON against Pydantic schema with fence stripping."""

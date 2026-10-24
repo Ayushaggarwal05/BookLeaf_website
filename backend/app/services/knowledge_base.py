@@ -65,48 +65,50 @@ BOOKLEAF_POLICIES: Dict[str, Dict[str, Any]] = {
     "Royalty & Payments": {
         "title": "Royalty Calculation & Payout Policy",
         "rules": [
-            "Royalty Split: BookLeaf operates on an 80/20 net profit split (80% payable to author, 20% retained by BookLeaf).",
-            "Net Profit Definition: Net profit is calculated by deducting manufacturing/printing costs, retail platform sales commission (e.g., Amazon, Flipkart, Ingram), and fulfillment/shipping fees from the Maximum Retail Price (MRP).",
+            "Royalty Split: BookLeaf operates on an 80/20 royalty split (80% of net profit goes to author, 20% retained by BookLeaf).",
+            "Net Profit Calculation: Net profit = Maximum Retail Price (MRP) minus printing cost, platform sales commission (Amazon/Flipkart), and shipping charges.",
             "Payout Schedule: Royalties are calculated quarterly and disbursed to authors within 45 calendar days following the close of each quarter (Q1 ends Mar 31 -> paid by May 15; Q2 ends Jun 30 -> paid by Aug 15; Q3 ends Sep 30 -> paid by Nov 15; Q4 ends Dec 31 -> paid by Feb 15).",
-            "Minimum Payout Threshold: The minimum payout threshold is ₹1,000. If accrued quarterly royalties are below ₹1,000, the outstanding balance rolls over into the subsequent quarterly payout cycle without deduction.",
-            "Taxes & Records: TDS deductions are applied in compliance with prevailing income tax regulations, and an official digital statement is issued upon remittance.",
+            "Minimum Payout Threshold: Minimum payout threshold is ₹1,000. If accumulated quarterly royalties are below ₹1,000, the balance rolls over to the next quarter without deduction.",
+            "Disbursement Method & Transparency: Payouts are made via direct bank transfer to the account linked in the author's dashboard. Authors can view a detailed royalty breakdown in their dashboard showing sales figures per platform.",
         ],
     },
     "ISBN & Metadata Issues": {
         "title": "ISBN Assignment & Metadata Management Policy",
         "rules": [
-            "ISBN Assignment: ISBNs are assigned directly by BookLeaf Publishing and registered under BookLeaf's official imprint, unless the author has obtained and registered an independent ISBN under their personal imprint.",
-            "Escalation SLA: Any reported ISBN mismatch (such as title, author, barcode, or format discrepancy) is designated as a High/Critical priority issue and escalated immediately to the cataloging and editorial operations desk.",
+            "ISBN Assignment: Every book published through BookLeaf receives a unique ISBN assigned by BookLeaf and registered under BookLeaf's publisher imprint. If an author wants an ISBN under their own imprint, they need to obtain it independently.",
+            "Escalation SLA: If an author reports an ISBN error (duplicate, wrong book linked, or barcode/metadata mismatch), it is treated as a high-priority issue and escalated immediately to the production team.",
             "Metadata Propagation: Author-requested metadata modifications (including book description/blurb, pricing adjustments, sub-genre classifications, or author biography) reflect across online retail channels within 3 to 5 business days.",
         ],
     },
     "Printing & Quality": {
-        "title": "Printing Turnaround & Manufacturing Quality Policy",
+        "title": "Printing Facilities, Turnaround & Quality Policy",
         "rules": [
-            "Standard Turnaround: Standard turnaround time for author proof copies and print-on-demand orders is 5 to 7 business days from print-file approval to carrier dispatch.",
-            "Defect Warranty & Free Reprints: BookLeaf guarantees professional craftsmanship. Verified printing or physical manufacturing defects (such as binding delamination, cover misregistration, color banding, or missing/inverted pages) qualify for an expedited free replacement reprint under our quality guarantee.",
-            "Verification Procedure: Authors are requested to submit clear photographic or video documentation of the defect along with the print delivery slip or batch reference.",
+            "Printing Facilities & Turnaround: In-house printing facility and warehouse are located in Delhi (handling most orders), with print partners including Repro India and Epitome Books for overflow or specific formats. Standard print turnaround is 5–7 business days from order confirmation to dispatch.",
+            "Defect Warranty & Free Reprints: If an author reports a quality issue (misprints, binding defects, or color inconsistency), BookLeaf guarantees professional craftsmanship and arranges an expedited free reprint after verification.",
+            "Verification Procedure: Authors may be requested to share clear photographic or video documentation of the defective copy along with the print delivery slip or batch reference.",
         ],
     },
     "Distribution & Availability": {
         "title": "Retail Distribution & Availability Policy",
         "rules": [
-            "Listing Turnaround: Following official publication, digital catalog ingestion and physical retail listings generally require 7 to 10 business days to become live across distribution channels (Amazon, Flipkart, BookLeaf Direct, Ingram).",
-            "Stock Availability Resync: If an active listing temporarily displays as 'Currently Unavailable' or 'Out of Stock', this typically reflects an automated inventory feed synchronization between the print facility and the retailer. Stock data resynchronization typically completes within 24 to 48 hours.",
+            "Distribution Channels: Books are listed on Amazon India, Flipkart, Amazon US, Amazon UK, and the BookLeaf Store.",
+            "Listing Timeline: Following completion of publication, new listings typically go live across retail channels within 7–10 business days.",
+            "Stock Out & Resync: If an active book listing is showing as unavailable on a platform, it usually indicates a stock synchronization issue. BookLeaf's operations team can trigger a manual re-sync within 24–48 hours.",
         ],
     },
     "Book Status & Production Updates": {
         "title": "Publishing Production Stages & Milestone Lifecycle",
         "rules": [
-            "Production Stages: The BookLeaf publishing pipeline progresses sequentially through: (1) Manuscript Receipt & Formatting, (2) Editorial Review (if enrolled), (3) Cover & Interior Design Proofing, (4) Typesetting & Layout Approval, (5) Author Proofreading Sign-Off, (6) ISBN Assignment & Barcoding, (7) Print Proof Approval, (8) Distribution Setup & Aggregator Ingestion, and (9) Live Publication.",
-            "Milestone Status: Production updates reflect the current verified stage in the database. Timelines for each milestone are communicated transparently.",
+            "Production Pipeline: A book progresses sequentially through: (1) Manuscript Receipt & Formatting → (2) Editing (if opted) → (3) Cover Design → (4) Typesetting → (5) Proofreading → (6) ISBN Assignment → (7) Printing → (8) Distribution Setup → (9) Published & Live Publication.",
+            "Author Updates & Bottlenecks: Authors are updated at each milestone via email. Production delays typically occur at Cover Design (waiting for author approval) and Proofreading (revision rounds).",
         ],
     },
     "General Inquiry": {
-        "title": "General Inquiries & Account Services Policy",
+        "title": "Company Overview & Publishing Packages Policy",
         "rules": [
-            "Account Updates: Contact information updates (email, phone, address, banking details) are processed securely after identity verification.",
-            "Communication Standard: BookLeaf's communication style is empathetic, professional, specific, accountable, and transparent regarding next steps.",
+            "Company Overview: BookLeaf Publishing is a self-publishing company operating in India and the US, providing end-to-end cover design, typesetting, ISBN assignment, printing, distribution, and royalty management.",
+            "Publishing Packages: BookLeaf offers two packages: Standard Free (no upfront cost) and Bestseller Breakthrough (premium, paid package with marketing and distribution add-ons).",
+            "Account Services: Author contact information, email, phone, city, or linked banking details are updated securely in the dashboard.",
         ],
     },
 }
