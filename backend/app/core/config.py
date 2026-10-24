@@ -68,9 +68,11 @@ class Settings(BaseSettings):
             # Default to canonical backend sqlite db
             return f"sqlite:///{(BACKEND_DIR / 'bookleaf_dev.db').as_posix()}"
         v = v.strip()
-        # Normalize legacy postgres:// URI to standard postgresql://
+        # Normalize legacy postgres:// and bare postgresql:// URI to postgresql+psycopg2://
         if v.startswith("postgres://"):
-            v = v.replace("postgres://", "postgresql://", 1)
+            v = v.replace("postgres://", "postgresql+psycopg2://", 1)
+        elif v.startswith("postgresql://") and not v.startswith("postgresql+"):
+            v = v.replace("postgresql://", "postgresql+psycopg2://", 1)
         elif v.startswith("sqlite:///") and not v.startswith("sqlite:///:memory:"):
             # Check if it's a relative path like sqlite:///./bookleaf_dev.db
             sqlite_path_str = v.replace("sqlite:///", "", 1)
