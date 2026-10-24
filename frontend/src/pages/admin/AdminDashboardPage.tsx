@@ -23,21 +23,25 @@ export const AdminDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchOverviewData = async () => {
-    setLoading(true);
+  const fetchOverviewData = async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const data = await api.admin.getTickets({ limit: 100 });
       setTickets(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load administrative overview.');
+      if (!silent) setError(err.message || 'Failed to load administrative overview.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOverviewData();
+    fetchOverviewData(false);
+    const interval = setInterval(() => {
+      fetchOverviewData(true);
+    }, 15000); // Auto-refresh metrics every 15s
+    return () => clearInterval(interval);
   }, []);
 
   // Compute metrics from actual ticket data
@@ -77,7 +81,7 @@ export const AdminDashboardPage: React.FC = () => {
             <h3 className="text-base font-semibold text-rose-900">Failed to load admin overview</h3>
             <p className="text-sm text-rose-700 mt-1">{error}</p>
             <button
-              onClick={fetchOverviewData}
+              onClick={() => fetchOverviewData(false)}
               className="mt-4 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold"
             >
               Retry
@@ -109,7 +113,7 @@ export const AdminDashboardPage: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={fetchOverviewData}
+            onClick={() => fetchOverviewData(false)}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-cream-300 text-xs font-semibold text-gray-700 hover:text-brand-950 hover:bg-cream-50 transition shadow-soft"
           >
             <RefreshCw className="w-3.5 h-3.5" />

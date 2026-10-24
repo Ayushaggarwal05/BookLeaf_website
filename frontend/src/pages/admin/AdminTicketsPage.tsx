@@ -103,8 +103,8 @@ export const AdminTicketsPage: React.FC = () => {
   }, [statusParam, priorityParam, categoryParam, assignedToParam, searchParam, dateFromParam, dateToParam]);
 
   // Load tickets based on current URL query params
-  const fetchTickets = useCallback(async () => {
-    setLoading(true);
+  const fetchTickets = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
 
     const skip = (pageParam - 1) * PAGE_SIZE;
@@ -132,14 +132,18 @@ export const AdminTicketsPage: React.FC = () => {
         setTickets(data);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch tickets from admin queue.');
+      if (!silent) setError(err.message || 'Failed to fetch tickets from admin queue.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [statusParam, priorityParam, categoryParam, assignedToParam, searchParam, dateFromParam, dateToParam, pageParam]);
 
   useEffect(() => {
-    fetchTickets();
+    fetchTickets(false);
+    const interval = setInterval(() => {
+      fetchTickets(true);
+    }, 15000); // Auto-refresh ticket queue every 15s
+    return () => clearInterval(interval);
   }, [fetchTickets]);
 
   // Apply filters by pushing to URL search params

@@ -24,21 +24,25 @@ export const TicketsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
 
-  const fetchTickets = async () => {
-    setLoading(true);
+  const fetchTickets = async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const data = await api.author.getTickets();
       setTickets(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load support tickets.');
+      if (!silent) setError(err.message || 'Failed to load support tickets.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTickets();
+    fetchTickets(false);
+    const interval = setInterval(() => {
+      fetchTickets(true);
+    }, 15000); // Auto-refresh author tickets every 15s
+    return () => clearInterval(interval);
   }, []);
 
   // Filter logic
@@ -111,7 +115,7 @@ export const TicketsPage: React.FC = () => {
             <h3 className="text-base font-semibold text-rose-900">Failed to load support queries</h3>
             <p className="text-sm text-rose-700 mt-1">{error}</p>
             <button
-              onClick={fetchTickets}
+              onClick={() => fetchTickets(false)}
               className="mt-4 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold"
             >
               Retry
